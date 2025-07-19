@@ -1,0 +1,205 @@
+<script type="module">
+"use strict";
+
+function buildWorkerEntryPoint(self) {
+    function lineBuffered(processLine) {
+        let buffer = new Uint8Array();
+        return (bytes) => {
+            if (bytes === null)
+                return; // ignore explicit flushes
+
+            let newBuffer = new Uint8Array(buffer.length + bytes.length);
+            newBuffer.set(buffer);
+            newBuffer.set(bytes, buffer.length);
+            buffer = newBuffer;
+
+            let newlineAt = -1;
+            while (true) {
+                const nextNewlineAt = buffer.indexOf(10, newlineAt + 1);
+                if (nextNewlineAt === -1)
+                    break;
+                processLine(new TextDecoder().decode(buffer.subarray(newlineAt + 1, nextNewlineAt)));
+                newlineAt = nextNewlineAt;
+            }
+            buffer = buffer.subarray(newlineAt + 1);
+        };
+    }
+
+    const bundleCommands = {};
+    async function build(files, scriptName, writeLine) {
+        const writeBytes = lineBuffered(writeLine);
+        const script = JSON.parse(files[scriptName]);
+        for (const scriptLine of script.commands) {
+            writeLine(`+ ${scriptLine.join(' ')}\n`);
+            const [name, ...args] = scriptLine;
+            try {
+                files = await bundleCommands[name](args, files, {
+                    stdout: writeBytes,
+                    stderr: writeBytes,
+                    decodeASCII: false,
+                });
+            } catch(e) {
+                return {code: e.code, files: e.files};
+            }
+        }
+        return {code: 0, files};
+    }
+
+    self.onmessage = async ({ data }) => {
+        if (data.type === 'initialize') {
+            for (const url of data.bundles) {
+                const bundle = await import(url);
+                for (const [name, runCommand] of Object.entries(bundle.commands)) {
+                    bundleCommands[name] = runCommand;
+                }
+            }
+            self.postMessage({ type: 'ready' });
+        } else if (data.type === 'build') {
+            const { files: filesIn, scriptName } = data;
+            const { code, files: filesOut } = await build(filesIn, scriptName, (line) => {
+                self.postMessage({ type: 'outputLine', line });
+            });
+            self.postMessage({ type: 'result', code, files: filesOut });
+        }
+    };
+}
+
+const buildWorkerObjectURL = URL.createObjectURL(new Blob(
+    [`(${buildWorkerEntryPoint.toString()})(self);`],
+    {type: 'application/javascript'}
+));
+
+globalThis.glasgowToolchain = {
+    packages: {
+        'yosys': '0.55',
+        'nextpnr-ice40': '0.8'
+    },
+    packageURL(packageName) {
+        const packageVersionSpec = this.packages[packageName];
+        return new URL(`https://cdn.jsdelivr.net/npm/@yowasp/${packageName}@${packageVersionSpec}/gen/bundle.js`);
+    },
+
+    available(packageName) {
+        return packageName in this.packages;
+    },
+    version(packageName) {
+        return this.packages[packageName];
+    },
+    build(files, scriptName, writeLine) {
+        return new Promise((resolve, reject) => {
+            const buildWorker = new Worker(buildWorkerObjectURL);
+            buildWorker.onmessage = ({ data }) => {
+                console.log(data);
+                if (data.type === 'ready') {
+                    buildWorker.postMessage({ type: 'build', files, scriptName });
+                } else if (data.type === 'outputLine') {
+                    writeLine(`${data.line}\n`);
+                } else if (data.type === 'result') {
+                    resolve({ code: data.code, files: data.files });
+                }
+            };
+            const bundleURLs = [];
+            for (const [packageName, packageVersion] of Object.entries(this.packages)) {
+                bundleURLs.push(this.packageURL(packageName).toString())
+            }
+            buildWorker.postMessage({ type: 'initialize', bundles: bundleURLs });
+        })
+    }
+}
+
+const { Terminal } = await import('https://cdn.jsdelivr.net/npm/@xterm/xterm/+esm');
+const xterm = new Terminal({
+    scrollback: 10000,
+    screenReaderMode: true,
+});
+xterm.open(document.getElementById('terminal'));
+xterm.focus();
+
+const { WebLinksAddon } = await import('https://cdn.jsdelivr.net/npm/@xterm/addon-web-links/+esm');
+xterm.loadAddon(new WebLinksAddon());
+
+const { FitAddon } = await import('https://cdn.jsdelivr.net/npm/@xterm/addon-fit/+esm');
+const fitAddon = new FitAddon();
+xterm.loadAddon(fitAddon);
+fitAddon.fit();
+
+const { openpty } = await import('https://cdn.jsdelivr.net/npm/xterm-pty/+esm');
+const { master: ptyAddon, slave: ptyHandle } = openpty();
+xterm.loadAddon(ptyAddon);
+
+const { loadPyodide } = await import("./pyodide.mjs");
+const pyodide = globalThis.pyodide = await loadPyodide({
+    env: { HOME: "/root" },
+});
+const FS = pyodide.FS;
+
+const conoutHandler = {
+    write(buf) {
+        ptyHandle.write(Array.from(buf));
+        return buf.length;
+    },
+    isatty: true
+};
+pyodide.setStdout(conoutHandler);
+pyodide.setStderr(conoutHandler);
+
+let coninResolve = () => {};
+let coninPromise = new Promise((resolve, reject) => coninResolve = resolve);
+let coninBuffer = [];
+FS.closeStream(0);
+FS.unlink("/dev/stdin");
+FS.createAsyncInputDevice("/dev", "stdin", async () => {
+    await coninPromise;
+    let data = coninBuffer;
+    coninPromise = new Promise((resolve, reject) => coninResolve = resolve);
+    coninBuffer = [];
+    return Uint8Array.from(data);
+});
+const stdinStream = FS.open("/dev/stdin", "r");
+if (stdinStream.fd !== 0) throw "stdin fd not zero";
+// stdinStream.tty = { ops: {} };
+ptyHandle.onReadable((data) => {
+    coninBuffer.splice(coninBuffer.length, 0, ...ptyHandle.read());
+    coninResolve();
+});
+
+let rootDir = "/root";
+FS.mkdirTree(rootDir);
+FS.mount(FS.filesystems.IDBFS, {autoPersist: true}, rootDir);
+FS.syncfs(true, (error) => {});
+
+await pyodide.loadPackage("micropip");
+pyodide.runPythonAsync(String.raw`
+import micropip
+await micropip.install('./markupsafe-3.0.2-cp313-cp313-pyodide_2025_0_wasm32.whl')
+await micropip.install('./cobs-1.2.1-cp313-cp313-pyodide_2025_0_wasm32.whl')
+await micropip.install('./glasgow-0.1-py3-none-any.whl')
+
+#from _pyrepl.main import interactive_console
+#interactive_console()
+
+import sys
+import asyncio
+import logging
+import shlex
+from glasgow.cli import main
+while True:
+    try:
+        command = input("\n> glasgow ")
+        sys.argv = ["glasgow", *shlex.split(command)]
+        asyncio.new_event_loop().run_until_complete(main())
+    except Exception as exn:
+        import sys, traceback
+        print(f"\x1b[1;31m{''.join(traceback.format_exception(exn))}\x1b[0m", file=sys.stderr, end="")
+    except SystemExit:
+        pass
+`);
+</script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm/css/xterm.css"></style>
+<style>
+    body { margin: 0; overflow: hidden; background: black; }
+    #terminal { position: absolute; height: 100%; width: 100%; }
+</style>
+
+<div id="terminal"></div>
