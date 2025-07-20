@@ -1,0 +1,28 @@
+{
+  "name": "glasgow-web",
+  "version": "0.0.0",
+  "description": "Glasgow Interface Explorer for the Web platform",
+  "author": "Catherine <whitequark@whitequark.org>",
+  "license": "BSD-0-Clause OR Apache-2",
+  "homepage": "https://glasgow-embedded.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GlasgowEmbedded/glasgow-webusb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GlasgowEmbedded/glasgow/issues"
+  },
+  "scripts": {
+    "build": "node build.mjs build",
+    "minify": "node build.mjs minify",
+    "watch": "node build.mjs watch",
+    "serve": "node build.mjs serve"
+  },
+  "devDependencies": {
+    "@chialab/esbuild-plugin-html": "^0.18.2",
+    "@chialab/esbuild-plugin-meta-url": "^0.18.2",
+    "esbuild": "^0.25.8",
+    "eslint": "^9.31.0",
+    "typescript-eslint": "^8.37.0"
+  }
+}
