@@ -1,14 +1,9 @@
-import { Builder } from './builder';
+import { } from './toolchain';
+import { Terminal } from './terminal';
 
-(new Builder).build(
-    {
-        'build_top.json': JSON.stringify({
-            commands: [
-                ["yosys", "--help"],
-                ["nextpnr-ice40", "--help"]
-            ]
-        })
-    },
-    'build_top.json',
-    (bytes) => {}
-);
+const xterm = new Terminal(<HTMLDivElement>document.getElementById('terminal'));
+xterm.focus();
+xterm.write(new TextEncoder().encode('hello world\n'));
+xterm.read().then((data) => {
+    xterm.write(data);
+});
