@@ -1,0 +1,34 @@
+on:
+  push:
+  pull_request:
+
+name: CI
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+      - name: Install and build
+        run: |
+          npm ci
+          npm run minify
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy-dev:
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
