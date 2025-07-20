@@ -3,11 +3,33 @@ import { Tree } from '@yowasp/runtime';
 import * as builderProto from './builder/proto';
 
 export class Builder {
-    #worker: Worker = new Worker(
-        new URL('./builder/worker.ts', import.meta.url),
-        { type: 'module' }
-    );
-    #busy: boolean = false;
+    #worker: Worker;
+    #busy: boolean;
+    #packages: Promise<{ [name: string]: string }>;
+
+    constructor() {
+        const workerURL = new URL('./builder/worker.ts', import.meta.url);
+        this.#worker = new Worker(workerURL, { type: 'module' });
+        this.#busy = true;
+        this.#packages = new Promise((resolve, reject) => {
+            this.#worker.onmessage = (event: MessageEvent<builderProto.BuilderToAppMessage>) => {
+                const message = event.data;
+                if (message.type === 'packages') {
+                    this.#busy = false;
+                    resolve(message.packages);
+                } else if (message.type === 'error') {
+                    reject(message.error);
+                    this.#busy = false;
+                } else {
+                    throw new Error(`Unexpected message '${message.type}'`);
+                }
+            };
+        });
+    }
+
+    packages(): Promise<{ [name: string]: string }> {
+        return this.#packages;
+    }
 
     build(
         files: Tree,
@@ -30,7 +52,7 @@ export class Builder {
                     reject(message.error);
                     this.#busy = false;
                 } else {
-                    (message satisfies never);
+                    throw new Error(`Unexpected message '${message.type}'`);
                 }
             };
             this.#worker.postMessage({

@@ -11,20 +11,35 @@ const options = {
     logLevel: 'info',
     plugins: [metaUrlPlugin(), htmlPlugin()],
     bundle: true,
+    splitting: false,
+    loader: {
+        '.json': 'file',
+        '.wasm': 'file',
+        '.asm.wasm': 'copy',
+        '.zip': 'file',
+        '.whl': 'file',
+    },
     define: {
-        'globalThis.GIT_COMMIT': `"${mode === 'minify' ? gitCommit : 'HEAD'}"`
+        'globalThis.GIT_COMMIT': `"${mode === 'minify' ? gitCommit : 'HEAD'}"`,
     },
     external: [
         'fs/promises', // @yowasp/yosys
+        'node:*', // pyodide
+        'fs', // pyodide
+        'path', // pyodide
+        'crypto', // pyodide
+        'child_process', // pyodide
+        'ws', // pyodide
     ],
     target: 'es2021',
     format: 'esm',
-    sourcemap: 'linked',
+    sourcemap: (mode === 'minify'),
     minify: (mode === 'minify'),
     outdir: 'dist',
     publicPath: '.',
     entryPoints: {
         'index': 'src/index.html',
+        'pyodide.asm': 'src/pyodide/pyodide.asm.wasm',
     },
 };
 

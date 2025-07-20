@@ -53,4 +53,12 @@ export class Terminal {
         this.#readPromise = new Promise((resolve, _reject) => this.#readResolve = resolve);
         return Uint8Array.from(this.#readBuffer.splice(0));
     }
+
+    onInterrupt(handler: () => void) {
+        this.#ptyHandle.onSignal((signal) => {
+            if (signal === 'SIGINT') {
+                handler();
+            }
+        });
+    }
 }

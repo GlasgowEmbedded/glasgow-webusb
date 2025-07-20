@@ -18,12 +18,15 @@ interface Script {
 }
 
 const commands = (async () => {
+    const packages = new Map<string, string>();
     const commands = new Map<string, Command>();
-    for (const bundle of [yosys, nextpnrIce40]) {
-        for (const [name, run] of Object.entries(bundle.commands)) {
-            commands.set(name, { run, Exit: bundle.Exit });
+    for (const [bundleName, bundle] of Object.entries({ yosys, 'nextpnr-ice40': nextpnrIce40 })) {
+        packages.set(bundleName, bundle.version);
+        for (const [commandName, commandRun] of Object.entries(bundle.commands)) {
+            commands.set(commandName, { run: commandRun, Exit: bundle.Exit });
         }
     }
+    postMessage({ type: 'packages', packages: Object.fromEntries(packages.entries()) });
     return commands;
 })();
 

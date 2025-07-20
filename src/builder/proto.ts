@@ -1,5 +1,10 @@
 import { Tree } from '@yowasp/runtime';
 
+export interface PackagesMessage {
+    type: 'packages',
+    packages: { [name: string]: string }
+}
+
 export interface BuildMessage {
     type: 'build',
     files: Tree,
@@ -26,6 +31,7 @@ export type AppToBuilderMessage =
     | BuildMessage;
 
 export type BuilderToAppMessage =
+    | PackagesMessage
     | OutputMessage
     | ResultMessage
     | ErrorMessage;
