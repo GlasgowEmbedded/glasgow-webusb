@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "bundler",
+        "module": "esnext",
+        "target": "es2021",
+        "lib": [
+            "es2020",
+            "dom"
+        ],
+        "noImplicitAny": true
+    }
+}

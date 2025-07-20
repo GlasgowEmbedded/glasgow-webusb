@@ -19,8 +19,11 @@
     "serve": "node build.mjs serve"
   },
   "devDependencies": {
-    "@chialab/esbuild-plugin-html": "^0.18.2",
     "@chialab/esbuild-plugin-meta-url": "^0.18.2",
+    "@chialab/esbuild-plugin-html": "^0.18.2",
+    "@yowasp/runtime": "^9.0.56",
+    "@yowasp/yosys": "release",
+    "@yowasp/nextpnr-ice40": "release",
     "esbuild": "^0.25.8",
     "eslint": "^9.31.0",
     "typescript-eslint": "^8.37.0"

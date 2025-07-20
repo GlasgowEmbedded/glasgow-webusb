@@ -12,8 +12,11 @@ const options = {
     plugins: [metaUrlPlugin(), htmlPlugin()],
     bundle: true,
     define: {
-        'globalThis.GIT_COMMIT': `"${mode === 'minify' ? gitCommit : 'HEAD'}"`,
+        'globalThis.GIT_COMMIT': `"${mode === 'minify' ? gitCommit : 'HEAD'}"`
     },
+    external: [
+        'fs/promises', // @yowasp/yosys
+    ],
     target: 'es2021',
     format: 'esm',
     sourcemap: 'linked',
