@@ -24,8 +24,4 @@ Navigate to http://127.0.0.1:8020/. (WebUSB only works on secure origins, so mak
     - `COLUMNS` isn't set properly, etc
 - Setting stdin to be a tty is broken for some reason
 - Some sort of UI chrome, including:
-    - Explanation of basic features
-        - no data is ever sent to the server
-        - files in /root are preserved across reloads
-    - A way to mount a directory on the host system using File System Access API
     - A button to interrupt execution for people who can't type Ctrl+C

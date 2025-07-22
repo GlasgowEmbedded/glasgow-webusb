@@ -1,3 +1,4 @@
+import js
 import sys
 import shlex
 import asyncio
@@ -8,11 +9,17 @@ while failures < 3:
     try:
         command = input("\n> glasgow ")
         sys.argv = ["glasgow", *shlex.split(command)]
-        asyncio.new_event_loop().run_until_complete(main())
+        await js.syncFSFromBacking()
+        try:
+            await asyncio.create_task(main())
+        finally:
+            await js.syncFSToBacking()
         failures = 0
-    except (SystemExit, KeyboardInterrupt, asyncio.CancelledError):
+    except asyncio.CancelledError:
         pass
-    except Exception as exn:
+    except KeyboardInterrupt:
+        print()
+    except BaseException as exn:
         import sys, traceback
         print(f"\n\x1b[1;31m{''.join(traceback.format_exception(exn))}\x1b[0m", file=sys.stderr, end="")
         failures += 1

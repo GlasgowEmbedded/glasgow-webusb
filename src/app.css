@@ -3,14 +3,23 @@
 body {
     margin: 0;
     overflow: hidden;
+    color: white;
     background: black;
 }
 
+a {
+    color: lightblue;
+}
+
+#bar {
+    padding: 12px 20px;
+}
+
 #terminal {
-    color: white;
     font-family: monospace;
     font-size: 20px;
     position: absolute;
-    height: 100%;
     width: 100%;
+    top: 50px;
+    bottom: 0px;
 }
