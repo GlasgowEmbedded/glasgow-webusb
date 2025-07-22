@@ -7,6 +7,9 @@ body {
 }
 
 #terminal {
+    color: white;
+    font-family: monospace;
+    font-size: 20px;
     position: absolute;
     height: 100%;
     width: 100%;

@@ -2,17 +2,31 @@ import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
 import { Terminal } from './terminal';
 
-const xterm = new Terminal(<HTMLDivElement>document.getElementById('terminal'));
-xterm.focus();
+const HOME_DIRECTORY = "/root";
 
-const homeDirectory = "/root";
 (async () => {
+    const xtermContainer = <HTMLDivElement>document.getElementById('terminal');
+
+    if (typeof WebAssembly !== "object") {
+        xtermContainer.innerText = 'WebAssembly is required but not available.';
+        return;
+    }
+
+    if (typeof navigator.usb !== "object") {
+        xtermContainer.innerText = 'WebUSB is required but not available.';
+        return;
+    }
+
+    xtermContainer.innerText = '';
+    const xterm = new Terminal(xtermContainer);
+    xterm.focus();
+
     xterm.write(new TextEncoder().encode('Loading toolchain...\n'));
     await loadToolchain();
 
     xterm.write(new TextEncoder().encode('Loading Python...\n'));
     const pyodide = await loadPyodide({
-        env: { HOME: homeDirectory },
+        env: { HOME: HOME_DIRECTORY },
     });
 
     const interruptBuffer = new Uint8Array(new ArrayBuffer(1));
@@ -39,8 +53,8 @@ const homeDirectory = "/root";
     // broken:
     // stdinStream.tty = { ops: {} };
 
-    pyodide.FS.mkdirTree(homeDirectory);
-    pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, homeDirectory);
+    pyodide.FS.mkdirTree(HOME_DIRECTORY);
+    pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
     pyodide.FS.syncfs(true, (error) => {
         if (error !== null) {
             console.log('[IDBFS Error]', error);

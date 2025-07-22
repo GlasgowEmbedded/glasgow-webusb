@@ -2,8 +2,8 @@
     "extends": "../tsconfig.json",
     "compilerOptions": {
         "lib": [
-            "es2020",
-            "webworker"
+            "ES2020",
+            "WebWorker"
         ],
     }
 }

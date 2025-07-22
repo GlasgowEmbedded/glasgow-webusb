@@ -4,8 +4,8 @@
         "module": "esnext",
         "target": "es2021",
         "lib": [
-            "es2020",
-            "dom"
+            "ES2020",
+            "DOM"
         ],
         "noImplicitAny": true
     }
