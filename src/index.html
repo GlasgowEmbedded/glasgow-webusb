@@ -9,10 +9,15 @@
   <body>
     <div class="glasgow-app">
       <div class="glasgow-bar">
-        Experimental software, use at your own risk.
-        All data is processed locally.
-        Files in /root persist over reloads.
-        <button type="button" id="mountNativeFS">Mount /mnt</button>
+        <div>
+          <p>
+            Experimental software, use at your own risk. All data is processed
+            locally. Files in <code>/root</code> persist over reloads.
+          </p>
+        </div>
+        <div class="glasgow-controls">
+          <button type="button" id="mountNativeFS">Mount /mnt</button>
+        </div>
       </div>
       <div class="glasgow-terminal">
         <div id="terminal">This application requires JavaScript, WebAssembly, JSPI, and WebUSB.</div>

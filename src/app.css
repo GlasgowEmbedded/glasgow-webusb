@@ -1,14 +1,21 @@
 @import './reset.css';
 @import '@xterm/xterm/css/xterm.css';
 
-html, body, .glasgow-app {
-    height: 100%;
+:root {
     background: black;
     color: white;
+    font-family: sans-serif;
 }
 
-a {
-    color: lightblue;
+html, body, .glasgow-app {
+    height: 100%;
+}
+
+code {
+    font-family: monospace;
+    background-color: #444;
+    padding: 2px;
+    border-radius: 4px;
 }
 
 #terminal {
@@ -26,9 +33,32 @@ a {
 }
 
 .glasgow-bar {
+    color: #ddd;
+    background: #222;
     padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: 12px;
+}
+
+.glasgow-bar p {
+    flex: 1;
+}
+
+.glasgow-controls button {
+    width: max-content;
 }
 
 .xterm-screen {
     padding: 12px;
+}
+
+@media (width < 640px) {
+    .glasgow-bar {
+        flex-direction: column;
+        align-items: normal;
+        column-gap: 0;
+        row-gap: 12px;
+    }
 }
