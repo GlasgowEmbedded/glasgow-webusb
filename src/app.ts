@@ -12,6 +12,12 @@ const HOME_DIRECTORY = "/root";
         return;
     }
 
+    // @ts-expect-error
+    if (typeof WebAssembly.promising !== "function") {
+        xtermContainer.innerText = 'WebAssembly JSPI is required but not available.';
+        return;
+    }
+
     if (typeof navigator.usb !== "object") {
         xtermContainer.innerText = 'WebUSB is required but not available.';
         return;
@@ -80,15 +86,20 @@ const HOME_DIRECTORY = "/root";
         import shlex
         from glasgow.cli import main
 
-        while True:
+        failures = 0
+        while failures < 3:
             try:
                 command = input("\n> glasgow ")
                 sys.argv = ["glasgow", *shlex.split(command)]
                 asyncio.new_event_loop().run_until_complete(main())
-            except Exception as exn:
-                import sys, traceback
-                print(f"\x1b[1;31m{''.join(traceback.format_exception(exn))}\x1b[0m", file=sys.stderr, end="")
+                failures = 0
             except SystemExit:
                 pass
+            except Exception as exn:
+                import sys, traceback
+                print(f"\n\x1b[1;31m{''.join(traceback.format_exception(exn))}\x1b[0m", file=sys.stderr, end="")
+                failures += 1
+
+        print(f"\nToo many errors, giving up.")
     `);
 })();
