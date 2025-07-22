@@ -28,3 +28,7 @@ a {
 .glasgow-bar {
     padding: 12px 20px;
 }
+
+.xterm-screen {
+    padding: 12px;
+}
