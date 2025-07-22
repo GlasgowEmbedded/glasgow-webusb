@@ -83,36 +83,40 @@ declare global {
     pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
     syncFSFromBacking();
 
-    const mountNativeFSLink = <HTMLLinkElement>document.getElementById('mountNativeFS');
-    const unmountNativeFSLink = <HTMLLinkElement>document.getElementById('unmountNativeFS');
+    let isNativeFSMounted = false;
+    const toggleNativeFSMountButton = <HTMLButtonElement>document.getElementById('mountNativeFS');
 
-    mountNativeFSLink.onclick = async (event: PointerEvent) => {
+    toggleNativeFSMountButton.onclick = async (event: PointerEvent) => {
         event.preventDefault();
-        mountNativeFSLink.style.display = 'none';
+        toggleNativeFSMountButton.disabled = true;
 
-        try {
-            const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
-            pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
-                fileSystemHandle,
-                autoPersist: true
-            }, MOUNT_DIRECTORY);
-            syncFSFromBacking();
-            unmountNativeFSLink.style.display = '';
-        } catch {
-            mountNativeFSLink.style.display = '';
+        if (isNativeFSMounted) {
+            // Native FS is mounted, so handle unmounting
+
+            // @ts-expect-error
+            pyodide.FS.unmount(MOUNT_DIRECTORY);
+            pyodide.FS.rmdir(MOUNT_DIRECTORY);
+            isNativeFSMounted = false;
+        } else {
+            // Native FS is unmounted, so select a directory and mount it
+            try {
+                const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
+                pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
+                    fileSystemHandle,
+                    autoPersist: true
+                }, MOUNT_DIRECTORY);
+                syncFSFromBacking();
+
+                isNativeFSMounted = true;
+            } catch (error) {
+                console.info("Got error while mounting native FS", error);
+            }
         }
-    };
 
-    unmountNativeFSLink.onclick = async (event: PointerEvent) => {
-        event.preventDefault();
-        unmountNativeFSLink.style.display = 'none';
-
-        // @ts-expect-error
-        pyodide.FS.unmount(MOUNT_DIRECTORY);
-        pyodide.FS.rmdir(MOUNT_DIRECTORY);
-
-        mountNativeFSLink.style.display = '';
+        // Update the button based on if the filesystem is now mounted
+        toggleNativeFSMountButton.disabled = false;
+        toggleNativeFSMountButton.innerText = isNativeFSMounted ? "Unmount /mnt" : "Mount /mnt";
     };
 
     xterm.write(new TextEncoder().encode('Loading dependencies...\n'));
