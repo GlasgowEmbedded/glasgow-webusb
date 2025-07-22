@@ -7,14 +7,18 @@
     <link rel="stylesheet" href="app.css">
   </head>
   <body>
-    <div id="bar">
-      Experimental software, use at your own risk.
-      All data is processed locally.
-      Files in /root persist over reloads.
-      <a href="#" id="mountNativeFS">Mount /mnt</a>
-      <a href="#" id="unmountNativeFS" style="display: none">Unmount /mnt</a>
+    <div class="glasgow-app">
+      <div class="glasgow-bar">
+        Experimental software, use at your own risk.
+        All data is processed locally.
+        Files in /root persist over reloads.
+        <a href="#" id="mountNativeFS">Mount /mnt</a>
+        <a href="#" id="unmountNativeFS" style="display: none">Unmount /mnt</a>
+      </div>
+      <div class="glasgow-terminal">
+        <div id="terminal">This application requires JavaScript, WebAssembly, JSPI, and WebUSB.</div>
+      </div>
     </div>
-    <div id="terminal">This application requires JavaScript, WebAssembly, JSPI, and WebUSB.</div>
     <script type="module" src="app.ts"></script>
   </body>
 </html>

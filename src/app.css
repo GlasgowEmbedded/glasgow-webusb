@@ -1,25 +1,30 @@
+@import './reset.css';
 @import '@xterm/xterm/css/xterm.css';
 
-body {
-    margin: 0;
-    overflow: hidden;
-    color: white;
+html, body, .glasgow-app {
+    height: 100%;
     background: black;
+    color: white;
 }
 
 a {
     color: lightblue;
 }
 
-#bar {
-    padding: 12px 20px;
+#terminal {
+    height: 100%;
 }
 
-#terminal {
-    font-family: monospace;
-    font-size: 20px;
-    position: absolute;
-    width: 100%;
-    top: 50px;
-    bottom: 0px;
+.glasgow-app {
+    display: flex;
+    flex-direction: column;
+}
+
+.glasgow-terminal {
+    flex: 1;
+    overflow: hidden;
+}
+
+.glasgow-bar {
+    padding: 12px 20px;
 }
