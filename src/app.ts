@@ -1,6 +1,8 @@
 import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
 import { Terminal } from './terminal';
+// @ts-expect-error
+import shell from './shell.py';
 
 const HOME_DIRECTORY = "/root";
 
@@ -80,26 +82,7 @@ const HOME_DIRECTORY = "/root";
 
         #from _pyrepl.main import interactive_console
         #interactive_console()
-
-        import sys
-        import asyncio
-        import shlex
-        from glasgow.cli import main
-
-        failures = 0
-        while failures < 3:
-            try:
-                command = input("\n> glasgow ")
-                sys.argv = ["glasgow", *shlex.split(command)]
-                asyncio.new_event_loop().run_until_complete(main())
-                failures = 0
-            except SystemExit:
-                pass
-            except Exception as exn:
-                import sys, traceback
-                print(f"\n\x1b[1;31m{''.join(traceback.format_exception(exn))}\x1b[0m", file=sys.stderr, end="")
-                failures += 1
-
-        print(f"\nToo many errors, giving up.")
     `);
+
+    await pyodide.runPythonAsync(shell);
 })();

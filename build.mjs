@@ -13,6 +13,7 @@ const options = {
     bundle: true,
     splitting: false,
     loader: {
+        '.py': 'text',
         '.json': 'file',
         '.wasm': 'file',
         '.asm.wasm': 'copy',
