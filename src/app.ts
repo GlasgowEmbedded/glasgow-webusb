@@ -91,6 +91,9 @@ declare global {
         mountNativeFSLink.style.display = 'none';
 
         try {
+            if (!confirm("The changes in the directory you pick will be reflected within /mnt and vice versa. Bugs may cause DATA CORRUPTION. Consider picking a new directory just for this application."))
+                throw new Error("declined");
+
             const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
             pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
@@ -114,6 +117,8 @@ declare global {
 
         mountNativeFSLink.style.display = '';
     };
+
+    mountNativeFSLink.style.display = '';
 
     xterm.write(new TextEncoder().encode('Loading dependencies...\n'));
     await pyodide.loadPackage([
