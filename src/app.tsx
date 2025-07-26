@@ -1,7 +1,6 @@
 import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
 import { Terminal } from './terminal';
-// @ts-expect-error
 import shell from './shell.py';
 
 const HOME_DIRECTORY = "/root";
