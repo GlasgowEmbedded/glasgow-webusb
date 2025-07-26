@@ -10,7 +10,7 @@ export default defineConfig([
             sourceType: "module",
         },
         files: [
-            '**/*.ts'
+            '**/*.{ts,tsx}',
         ],
         rules: {
             semi: "error",
