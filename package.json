@@ -33,5 +33,10 @@
     "eslint": "^9.31.0",
     "typescript-eslint": "^8.37.0",
     "xterm-pty": "^0.11.1"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.2.1",
+    "@vscode/codicons": "^0.0.38",
+    "preact": "^10.26.9"
   }
 }

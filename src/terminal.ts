@@ -12,9 +12,18 @@ export class Terminal {
     #readResolve: () => void;
 
     constructor(element: HTMLDivElement) {
+        let parentContainerStyles = getComputedStyle(element);
+
+        if (!/^[\d.]+px$/.test(parentContainerStyles.fontSize)) {
+            throw new Error(`Unexpected font-size value`);
+        }
+
         const xterm = new Xterm({
             scrollback: 10000,
             screenReaderMode: true,
+
+            fontFamily: parentContainerStyles.fontFamily,
+            fontSize: Number(parentContainerStyles.fontSize.replace(/px$/, '')),
         });
         xterm.open(element);
         this.#xterm = xterm;

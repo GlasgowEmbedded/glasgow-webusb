@@ -1,6 +1,10 @@
+import { render } from 'preact';
+import { computed, effect, signal } from '@preact/signals';
 import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
+import { Area } from './area';
 import { Terminal } from './terminal';
+import { TreeNode, TreeView } from './tree-view';
 import shell from './shell.py';
 
 const HOME_DIRECTORY = "/root";
@@ -9,10 +13,146 @@ const MOUNT_DIRECTORY = "/mnt";
 declare global {
     function syncFSFromBacking(): Promise<void>;
     function syncFSToBacking(): Promise<void>;
+
+    function signalExecutionStart(): void;
+    function signalExecutionEnd(): void;
+}
+
+interface FileTreeNode extends TreeNode<FileTreeNode> {
+    path: string;
 }
 
 (async () => {
-    const xtermContainer = <HTMLDivElement>document.getElementById('terminal');
+    const fileTree = signal<FileTreeNode[] | null>(null);
+
+    const isNativeFSMounted = signal(false);
+    const isNativeFSMountDisabled = signal(true);
+
+    const handleMountNativeFSClick = async () => {
+        isNativeFSMountDisabled.value = true;
+
+        if (isNativeFSMounted.value) {
+            // @ts-expect-error
+            pyodide.FS.unmount(MOUNT_DIRECTORY);
+            pyodide.FS.rmdir(MOUNT_DIRECTORY);
+
+            isNativeFSMounted.value = false;
+            isNativeFSMountDisabled.value = false;
+            return;
+        }
+
+        try {
+            if (!confirm("The changes in the directory you pick will be reflected within /mnt and vice versa. Bugs may cause DATA CORRUPTION. Consider picking a new directory just for this application."))
+                throw new Error("declined");
+
+            const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
+            pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
+                fileSystemHandle,
+                autoPersist: true
+            }, MOUNT_DIRECTORY);
+            syncFSFromBacking();
+            isNativeFSMounted.value = true;
+        } finally {
+            isNativeFSMountDisabled.value = false;
+        }
+    };
+
+    const isCurrentlyExecutingCommand = signal(false);
+    const isInterruptExecutionButtonEnabled = signal(false);
+    let interruptExecutionButtonActivationTimeout: number | null = null;
+
+    effect(() => {
+        if (isCurrentlyExecutingCommand.value) {
+            interruptExecutionButtonActivationTimeout = setTimeout(() => {
+                isInterruptExecutionButtonEnabled.value = true;
+            }, 100);
+        } else {
+            if (interruptExecutionButtonActivationTimeout !== null) {
+                clearTimeout(interruptExecutionButtonActivationTimeout);
+                interruptExecutionButtonActivationTimeout = null;
+            }
+            isInterruptExecutionButtonEnabled.value = false;
+        }
+    });
+
+    globalThis.signalExecutionStart = () => {
+        isCurrentlyExecutingCommand.value = true;
+    };
+
+    globalThis.signalExecutionEnd = () => {
+        isCurrentlyExecutingCommand.value = false;
+    };
+
+    const handleInterruptExecutionClick = () => {
+        interrupt();
+    };
+
+    const handleFileTreeNodeAction = (event: Event, node: FileTreeNode) => {
+        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
+        let fileContents: Uint8Array = pyodide.FS.readFile(node.path);
+        let url = URL.createObjectURL(new Blob([fileContents]));
+        let element = document.createElement('a');
+        element.href = url;
+        element.download = node.name;
+        element.click();
+        URL.revokeObjectURL(url);
+    };
+
+    render(
+        <>
+            <Area
+                id="terminal-area"
+                name="Terminal"
+                iconName="terminal"
+                actions={computed(() => [
+                    {
+                        name: 'Stop execution',
+                        iconName: 'stop-circle',
+                        disabled: !isInterruptExecutionButtonEnabled.value,
+                        handleAction: handleInterruptExecutionClick,
+                    },
+                    'showDirectoryPicker' in window && {
+                        name: isNativeFSMounted.value ? 'Unmount /mnt' : 'Mount /mnt',
+                        disabled: isNativeFSMountDisabled.value,
+                        handleAction: handleMountNativeFSClick,
+                    },
+                ].filter(Boolean))}
+            >
+                <div class="area-content" id="terminal" />
+            </Area>
+            <Area
+                id="file-tree-area"
+                name="/root"
+                iconName="folder-opened"
+                helpText="Persisted over reloads"
+            >
+                <div class="area-content file-tree">
+                    {computed(() => (
+                        fileTree.value
+                            ? (
+                                <TreeView
+                                    nodes={fileTree.value}
+                                    emptyTreeMessage="Directory is empty"
+                                    handleNodeAction={handleFileTreeNodeAction}
+                                />
+                            )
+                            : <i>Waiting...</i>
+                    ))}
+                </div>
+            </Area>
+            <footer>
+                <h2>Glasgow via WebUSB</h2>
+                <p>
+                    Experimental software, use at your own risk.
+                    All data is processed locally.
+                </p>
+            </footer>
+        </>,
+        document.querySelector('.main'),
+    );
+
+    const xtermContainer = document.getElementById('terminal') as HTMLDivElement;
     if (typeof WebAssembly !== "object") {
         xtermContainer.innerText = 'WebAssembly is required but not available.';
         return;
@@ -39,8 +179,9 @@ declare global {
     });
 
     const interruptBuffer = new Uint8Array(new ArrayBuffer(1));
+    const interrupt = () => { interruptBuffer[0] = 2; };
     pyodide.setInterruptBuffer(interruptBuffer);
-    xterm.onInterrupt(() => interruptBuffer[0] = 2);
+    xterm.onInterrupt(interrupt);
 
     const conoutHandler = {
         write(buf: Uint8Array) {
@@ -62,62 +203,61 @@ declare global {
     // broken:
     // stdinStream.tty = { ops: {} };
 
-    globalThis.syncFSFromBacking = async () => {
+    const readFileTree = (path: string) => {
+        let result = [];
+        let names = pyodide.FS.readdir(path);
+        for (let name of names) {
+            if (name === '.' || name === '..') {
+                continue;
+            }
+
+            let node: FileTreeNode = {
+                name,
+                path: `${path}/${name}`,
+            };
+            let stat = pyodide.FS.stat(node.path, true);
+            if (pyodide.FS.isDir(stat.mode)) {
+                node.children = readFileTree(node.path);
+            }
+            result.push(node);
+        }
+        result.sort((a, b) => {
+            return Number(!!b.children) - Number(!!a.children);
+        });
+        return result;
+    };
+
+    globalThis.syncFSFromBacking = () => new Promise((resolve, reject) => {
         pyodide.FS.syncfs(true, (error) => {
             if (error !== null) {
                 console.log('[FS Error]', error);
+                reject(error);
+                return;
             }
-        });
-    };
 
-    globalThis.syncFSToBacking = async () => {
+            resolve();
+        });
+    });
+
+    globalThis.syncFSToBacking = () => new Promise((resolve, reject) => {
         pyodide.FS.syncfs(false, (error) => {
             if (error !== null) {
                 console.log('[FS Error]', error);
+                reject(error);
+                return;
             }
+
+            resolve();
         });
-    };
+    });
 
     pyodide.FS.mkdirTree(HOME_DIRECTORY);
     pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
-    syncFSFromBacking();
+    syncFSFromBacking().then(() => {
+        fileTree.value = readFileTree('/root');
+    });
 
-    const mountNativeFSLink = <HTMLLinkElement>document.getElementById('mountNativeFS');
-    const unmountNativeFSLink = <HTMLLinkElement>document.getElementById('unmountNativeFS');
-
-    mountNativeFSLink.onclick = async (event: PointerEvent) => {
-        event.preventDefault();
-        mountNativeFSLink.style.display = 'none';
-
-        try {
-            if (!confirm("The changes in the directory you pick will be reflected within /mnt and vice versa. Bugs may cause DATA CORRUPTION. Consider picking a new directory just for this application."))
-                throw new Error("declined");
-
-            const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
-            pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
-                fileSystemHandle,
-                autoPersist: true
-            }, MOUNT_DIRECTORY);
-            syncFSFromBacking();
-            unmountNativeFSLink.style.display = '';
-        } catch {
-            mountNativeFSLink.style.display = '';
-        }
-    };
-
-    unmountNativeFSLink.onclick = async (event: PointerEvent) => {
-        event.preventDefault();
-        unmountNativeFSLink.style.display = 'none';
-
-        // @ts-expect-error
-        pyodide.FS.unmount(MOUNT_DIRECTORY);
-        pyodide.FS.rmdir(MOUNT_DIRECTORY);
-
-        mountNativeFSLink.style.display = '';
-    };
-
-    mountNativeFSLink.style.display = '';
+    isNativeFSMountDisabled.value = false;
 
     xterm.write(new TextEncoder().encode('Loading dependencies...\n'));
     await pyodide.loadPackage([

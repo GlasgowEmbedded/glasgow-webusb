@@ -1,25 +1,230 @@
 @import '@xterm/xterm/css/xterm.css';
 
+:root {
+    --color-theme: #353838;
+    --color-accent: #88f;
+
+    --color-page-background: oklch(from var(--color-theme) calc(l - 0.06) c h);
+    --color-area-background: var(--color-theme);
+    --color-terminal-background: var(--color-area-background);
+
+    --color-button-background: var(--color-theme);
+    --color-button-border: var(--color-border);
+    --color-button-text: var(--color-text);
+
+    --color-button-hover-background: oklch(from var(--color-button-background) calc(l + 0.1) c h);
+    --color-button-hover-border: oklch(from var(--color-button-border) calc(l + 0.2) c h);
+    --color-button-hover-text: var(--color-button-text);
+
+    --color-button-active-background: oklch(from var(--color-button-background) calc(l - 0.1) c h);
+    --color-button-active-border: oklch(from var(--color-button-border) calc(l + 0.2) c h);
+    --color-button-active-text: oklch(from var(--color-button-text) calc(l - 0.1) c h);
+
+    --color-button-disabled-background: oklch(from var(--color-button-background) calc(l + 0.1) c h);
+    --color-button-disabled-border: var(--color-button-border);
+    --color-button-disabled-text: oklch(from var(--color-button-text) 0.7 c h);
+
+    --color-tree-node-line-hover-background: oklch(from var(--color-theme) 0.8 c h / 0.2);
+
+    --color-border: oklch(from var(--color-theme) calc(l + 0.2) c h);
+    --color-text: oklch(from var(--color-theme) 0.95 c h);
+    --color-text-muted: oklch(from var(--color-theme) 0.7 c h);
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
+    min-height: 100vh;
     margin: 0;
     overflow: hidden;
-    color: white;
-    background: black;
+    color: var(--color-text);
+    background: var(--color-page-background);
+    font-family: system-ui, sans-serif;
+    font-size: 15px;
 }
 
-a {
-    color: lightblue;
+.main {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    grid-template-columns: 1fr 300px;
+    grid-template-areas:
+        'terminal sidebar'
+        'footer footer';
+    gap: 8px;
+    padding: 8px;
+    height: 100vh;
 }
 
-#bar {
-    padding: 12px 20px;
+button {
+    padding: 0 8px;
+    background: var(--color-button-background);
+    border: 1px solid var(--color-button-border);
+    color: var(--color-button-text);
+    border-radius: 0;
+    font: inherit;
+    font-size: 15px;
+    line-height: 26px;
+
+    &:not(:disabled) {
+        &:hover {
+            background: var(--color-button-hover-background);
+            border-color: var(--color-button-hover-border);
+            color: var(--color-button-hover-text);
+        }
+
+        &:active {
+            background: var(--color-button-active-background);
+            border-color: var(--color-button-active-border);
+            color: var(--color-button-active-text);
+        }
+    }
+
+    &:disabled {
+        background: var(--color-button-disabled-background);
+        border-color: var(--color-button-disabled-border);
+        color: var(--color-button-disabled-text);
+    }
+}
+
+.aligned-icon {
+    vertical-align: middle;
+    margin-block-start: calc(1ex - 1cap);
+}
+
+footer {
+    grid-area: footer;
+    color: var(--color-text-muted);
+
+    h2 {
+        margin: 0 0 4px;
+        font-size: inherit;
+    }
+
+    p {
+        margin: 0;
+    }
+}
+
+.area {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+
+    header {
+        display: flex;
+        align-items: flex-start;
+        height: 36px;
+        gap: 8px;
+        border-block-end: 1px solid var(--color-border);
+        border-radius: 4px 4px 0 0;
+
+        h2 {
+            line-height: 35px;
+            width: fit-content;
+            margin: 0;
+            margin-inline-end: auto;
+            padding: 0 16px;
+            border: 1px solid var(--color-border);
+            border-block-end: none;
+            background: var(--color-area-background);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+
+            .icon {
+                margin-inline-end: 4px;
+            }
+        }
+
+        p {
+            margin: 0;
+            align-self: center;
+            color: var(--color-text-muted);
+        }
+    }
+
+    .area-content {
+        flex: 1;
+        height: 0;
+        background: var(--color-area-background);
+        border: 1px solid var(--color-border);
+        border-block-start: none;
+        overflow: auto;
+    }
+}
+
+#terminal-area {
+    grid-area: terminal;
 }
 
 #terminal {
+    height: 0;
     font-family: monospace;
-    font-size: 20px;
-    position: absolute;
-    width: 100%;
-    top: 50px;
-    bottom: 0px;
+    font-size: 15px;
+    overflow: hidden;
+
+    /* !important is used to override inline styles */
+
+    .xterm {
+        padding: 4px;
+    }
+
+    .xterm-viewport {
+        background-color: transparent !important;
+    }
+}
+
+.file-tree {
+    padding: 8px 0;
+
+    i, p {
+        display: block;
+        margin: 16px;
+        color: var(--color-text-muted);
+    }
+
+    ul {
+        margin: 0;
+        padding: 0;
+    }
+
+    li {
+        line-height: 24px;
+        list-style: none;
+
+        .tree-node-line {
+            display: grid;
+            grid-template-columns: 16px 16px 1fr;
+            align-items: center;
+            gap: 4px;
+            padding-inline-start: calc(16px + 20px * var(--level, 0));
+            padding-inline-end: 16px;
+            cursor: pointer;
+            user-select: none;
+
+            &:hover {
+                background-color: var(--color-tree-node-line-hover-background);
+            }
+
+            &:focus {
+                outline: 1px solid var(--color-accent);
+                outline-offset: -1px;
+            }
+
+            .tree-node-chevron {
+                grid-column: 1;
+            }
+
+            .tree-node-icon {
+                grid-column: 2;
+            }
+
+            .tree-node-name {
+                grid-column: 3;
+            }
+        }
+    }
 }

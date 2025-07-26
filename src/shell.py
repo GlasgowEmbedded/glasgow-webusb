@@ -10,9 +10,11 @@ while failures < 3:
         command = input("\n> glasgow ")
         sys.argv = ["glasgow", *shlex.split(command)]
         await js.syncFSFromBacking()
+        js.signalExecutionStart()
         try:
             await asyncio.create_task(main())
         finally:
+            js.signalExecutionEnd()
             await js.syncFSToBacking()
         failures = 0
     except asyncio.CancelledError:

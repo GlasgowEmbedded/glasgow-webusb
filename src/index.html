@@ -7,14 +7,8 @@
     <link rel="stylesheet" href="app.css">
   </head>
   <body>
-    <div id="bar">
-      Experimental software, use at your own risk.
-      All data is processed locally.
-      Files in /root persist over reloads.
-      <a href="#" id="mountNativeFS" style="display: none">Mount /mnt</a>
-      <a href="#" id="unmountNativeFS" style="display: none">Unmount /mnt</a>
-    </div>
-    <div id="terminal">This application requires JavaScript, WebAssembly, JSPI, and WebUSB.</div>
+    <noscript>This application requires JavaScript, WebAssembly, JSPI, and WebUSB.</noscript>
+    <div class="main"></div>
     <script type="module" src="app.tsx"></script>
   </body>
 </html>
