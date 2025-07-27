@@ -26,6 +26,8 @@
 
     --color-tree-node-line-hover-background: oklch(from var(--color-theme) 0.8 c h / 0.2);
 
+    --color-popup-backdrop: oklch(from var(--color-area-background) calc(l - 0.1) c h / 0.9);
+
     --color-border: oklch(from var(--color-theme) calc(l + 0.2) c h);
     --color-text: oklch(from var(--color-theme) 0.95 c h);
     --color-text-muted: oklch(from var(--color-theme) 0.7 c h);
@@ -46,13 +48,18 @@ body {
 }
 
 .main {
+    position: relative;
     display: grid;
-    grid-template-rows: 1fr;
-    grid-template-columns: 1fr 300px;
-    grid-template-areas: 'terminal sidebar';
+    grid-template-areas: 'terminal';
     gap: 8px;
-    padding: 8px;
     height: 100vh;
+
+    &.wide {
+        grid-template-rows: 1fr;
+        grid-template-columns: 1fr 300px;
+        grid-template-areas: 'terminal sidebar';
+        padding: 8px;
+    }
 }
 
 button {
@@ -98,24 +105,24 @@ button {
     min-height: 0;
 
     header {
+        --header-height: 44px;
+
         display: flex;
-        align-items: flex-start;
-        height: 36px;
-        gap: 8px;
+        align-items: center;
+        height: var(--header-height);
+        gap: 16px;
         border-block-end: 1px solid var(--color-border);
-        border-radius: 4px 4px 0 0;
+        white-space: nowrap;
 
         h2 {
-            line-height: 35px;
             width: fit-content;
             margin: 0;
+            margin-block-start: 1px;
             margin-inline-end: auto;
             padding: 0 16px;
-            border: 1px solid var(--color-border);
-            border-block-end: none;
-            background: var(--color-area-background);
             font-size: 12px;
             font-weight: 500;
+            line-height: calc(var(--header-height) - 1px);
             text-transform: uppercase;
 
             .icon {
@@ -123,10 +130,29 @@ button {
             }
         }
 
+        .area-visible-actions-wrapper {
+            flex: 1;
+            width: 0;
+            height: 100%;
+        }
+
+        .area-visible-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            height: 100%;
+        }
+
         p {
             margin: 0;
-            align-self: center;
             color: var(--color-text-muted);
+        }
+
+        button {
+            .icon:has(+ *) {
+                margin-inline-end: 4px;
+            }
         }
     }
 
@@ -134,9 +160,62 @@ button {
         flex: 1;
         height: 0;
         background: var(--color-area-background);
-        border: 1px solid var(--color-border);
-        border-block-start: none;
         overflow: auto;
+    }
+
+    &:not(.padded) {
+        header {
+            padding-inline-end: 8px;
+        }
+    }
+
+    &.padded {
+        header {
+            --header-height: 36px;
+
+            h2 {
+                border: 1px solid var(--color-border);
+                border-block-end: none;
+                background: var(--color-area-background);
+            }
+
+            .area-visible-actions {
+                align-items: flex-start;
+            }
+        }
+
+        .area-content {
+            border: 1px solid var(--color-border);
+            border-block-start: none;
+        }
+    }
+
+    .area-actions-menu-wrapper {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+    }
+
+    .area-actions-menu {
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        width: max-content;
+        min-width: 200px;
+        margin-block-start: -4px;
+        border: 1px solid var(--color-border);
+        box-shadow:
+            rgb(0 0 0 / 0.25) 0 2px 4px,
+            rgb(0 0 0 / 0.125) 0 4px 8px;
+
+        --color-button-disabled-background: var(--color-button-background);
+
+        button {
+            border: none;
+            line-height: 32px;
+            text-align: left;
+        }
     }
 }
 
@@ -165,7 +244,89 @@ button {
     }
 }
 
-.file-tree {
+#file-tree-area {
+    grid-area: sidebar;
+
+    .area {
+        height: 100%;
+    }
+
+    .main:not(.wide) & {
+        position: absolute;
+        inset: 0;
+        height: 100dvh;
+        background: var(--color-popup-backdrop);
+        animation: 0.2s ease fade-in-background;
+
+        .area {
+            padding: 8px;
+            animation: 0.2s ease slide-in;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            animation: 0.2s ease fade-in;
+
+            .area {
+                animation: none;
+            }
+        }
+
+        &.animating-out {
+            pointer-events: none;
+            animation: 0.2s ease fade-out-background;
+
+            .area {
+                animation: 0.2s ease slide-out;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                animation: 0.2s ease fade-out;
+
+                .area {
+                    animation: none;
+                }
+            }
+        }
+    }
+}
+
+@keyframes fade-in-background {
+    from {
+        background: transparent;
+    }
+}
+
+@keyframes fade-out-background {
+    to {
+        background: transparent;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes fade-out {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateY(100%);
+    }
+}
+
+@keyframes slide-out {
+    to {
+        transform: translateY(100%);
+    }
+}
+
+.tree {
     padding: 8px 0;
 
     i, p {

@@ -1,10 +1,12 @@
 import { render } from 'preact';
-import { computed, effect, signal } from '@preact/signals';
+import { batch, computed, effect, signal } from '@preact/signals';
+import debounce from 'lodash/debounce';
 import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
 import { Area } from './area';
 import { Terminal } from './terminal';
 import { TreeNode, TreeView } from './tree-view';
+import { classNames } from './helpers/class-names';
 import termColors from './terminal-colors';
 import shell from './shell.py';
 
@@ -26,6 +28,31 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
 (async () => {
     const isInitializing = signal(true);
     const fileTree = signal<FileTreeNode[] | null>(null);
+
+    const isUsingWideLayout = signal(false);
+    const updateWideLayoutState = () => {
+        isUsingWideLayout.value = window.innerWidth > 600;
+    };
+    updateWideLayoutState();
+    window.addEventListener('resize', debounce(updateWideLayoutState, 50));
+
+    let fileTreeElement: HTMLElement | null;
+    const isFileTreeAreaRendered = signal(false);
+    const isFileTreeAreaShown = signal(true);
+    const showFileTree = () => {
+        batch(() => {
+            isFileTreeAreaRendered.value = true;
+            isFileTreeAreaShown.value = true;
+        });
+    };
+    const hideFileTree = () => {
+        isFileTreeAreaShown.value = false;
+        if (fileTreeElement) {
+            fileTreeElement.addEventListener('animationend', () => {
+                isFileTreeAreaRendered.value = false;
+            }, { once: true });
+        }
+    };
 
     const isNativeFSMounted = signal(false);
     const isNativeFSMountDisabled = signal(true);
@@ -62,18 +89,15 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
 
     const isCurrentlyExecutingCommand = signal(false);
     const isInterruptExecutionButtonEnabled = signal(false);
-    let interruptExecutionButtonActivationTimeout: number | null = null;
+    const activateInterruptExecutionButton = debounce(() => {
+        isInterruptExecutionButtonEnabled.value = true;
+    }, 100);
 
     effect(() => {
         if (isCurrentlyExecutingCommand.value) {
-            interruptExecutionButtonActivationTimeout = setTimeout(() => {
-                isInterruptExecutionButtonEnabled.value = true;
-            }, 100);
+            activateInterruptExecutionButton();
         } else {
-            if (interruptExecutionButtonActivationTimeout !== null) {
-                clearTimeout(interruptExecutionButtonActivationTimeout);
-                interruptExecutionButtonActivationTimeout = null;
-            }
+            activateInterruptExecutionButton.cancel();
             isInterruptExecutionButtonEnabled.value = false;
         }
     });
@@ -102,17 +126,26 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
     };
 
     render(
-        <>
+        <div class={classNames('main', () => isUsingWideLayout.value && 'wide')}>
             <Area
                 id="terminal-area"
+                class={computed(() => isUsingWideLayout.value ? 'padded' : '')}
                 name="Terminal"
                 iconName="terminal"
                 actions={computed(() => [
                     {
-                        name: 'Stop execution',
+                        name: 'Stop',
                         iconName: 'stop-circle',
                         disabled: !isInterruptExecutionButtonEnabled.value,
                         handleAction: handleInterruptExecutionClick,
+                    },
+                    !isUsingWideLayout.value && {
+                        name: 'View /root',
+                        iconName: 'folder-opened',
+                        disabled: false,
+                        handleAction() {
+                            showFileTree();
+                        },
                     },
                     'showDirectoryPicker' in window && {
                         name: isNativeFSMounted.value ? 'Unmount /mnt' : 'Mount /mnt',
@@ -123,28 +156,48 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
             >
                 <div class="area-content" id="terminal" />
             </Area>
-            <Area
+            {computed(() => isUsingWideLayout.value || isFileTreeAreaRendered.value ? <div
+                ref={(element) => {
+                    fileTreeElement = element;
+                    return () => {
+                        fileTreeElement = null;
+                    };
+                }}
                 id="file-tree-area"
-                name="/root"
-                iconName="folder-opened"
-                helpText="Persisted over reloads"
+                class={classNames(() => !isFileTreeAreaShown.value && 'animating-out')}
             >
-                <div class="area-content file-tree">
-                    {computed(() => (
-                        fileTree.value
-                            ? (
-                                <TreeView
-                                    nodes={fileTree.value}
-                                    emptyTreeMessage="Directory is empty"
-                                    handleNodeAction={handleFileTreeNodeAction}
-                                />
-                            )
-                            : <i>{computed(() => isInitializing.value ? 'Waiting...' : 'Unavailable')}</i>
-                    ))}
-                </div>
-            </Area>
-        </>,
-        document.querySelector('.main'),
+                <Area
+                    class="padded"
+                    name="/root"
+                    iconName="folder-opened"
+                    actions={computed(() => isUsingWideLayout.value ? [] : [
+                        {
+                            name: 'Close',
+                            iconName: 'close',
+                            disabled: false,
+                            handleAction() {
+                                hideFileTree();
+                            },
+                        },
+                    ])}
+                >
+                    <div class="area-content tree">
+                        {computed(() => (
+                            fileTree.value
+                                ? (
+                                    <TreeView
+                                        nodes={fileTree.value}
+                                        emptyTreeMessage="Directory is empty"
+                                        handleNodeAction={handleFileTreeNodeAction}
+                                    />
+                                )
+                                : <i>{computed(() => isInitializing.value ? 'Waiting...' : 'Unavailable')}</i>
+                        ))}
+                    </div>
+                </Area>
+            </div> : null)}
+        </div>,
+        document.querySelector('#app'),
     );
 
     const xterm = new Terminal(document.getElementById('terminal'));
@@ -165,6 +218,7 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
     printText(termColors.bold('Glasgow via WebUSB'));
     printText('Experimental software, use at your own risk.');
     printText('All data is processed locally.');
+    printText('Files in /root are persisted over reloads.');
     printText('');
 
     try {
