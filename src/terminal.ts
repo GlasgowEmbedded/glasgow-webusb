@@ -4,14 +4,19 @@ import { FitAddon } from '@xterm/addon-fit';
 import { openpty } from 'xterm-pty';
 
 export class Terminal {
+    #element: HTMLElement;
+
     #xterm: Xterm;
+    #ptyAddon: ReturnType<typeof openpty>['master'];
     #ptyHandle: ReturnType<typeof openpty>['slave'];
 
     #readBuffer: number[];
     #readPromise: Promise<void>;
     #readResolve: () => void;
 
-    constructor(element: HTMLDivElement) {
+    constructor(element: HTMLElement) {
+        this.#element = element;
+
         let parentContainerStyles = getComputedStyle(element);
 
         if (!/^[\d.]+px$/.test(parentContainerStyles.fontSize)) {
@@ -39,6 +44,7 @@ export class Terminal {
 
         const { master: ptyAddon, slave: ptyHandle } = openpty();
         xterm.loadAddon(ptyAddon);
+        this.#ptyAddon = ptyAddon;
         this.#ptyHandle = ptyHandle;
 
         this.#readBuffer = [];
@@ -51,6 +57,11 @@ export class Terminal {
 
     focus() {
         this.#xterm.focus();
+    }
+
+    endSession() {
+        this.#ptyAddon.dispose();
+        this.#element.classList.add('session-ended');
     }
 
     write(bytes: Uint8Array) {

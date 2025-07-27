@@ -5,6 +5,7 @@ import { loadPyodide } from './pyodide';
 import { Area } from './area';
 import { Terminal } from './terminal';
 import { TreeNode, TreeView } from './tree-view';
+import termColors from './terminal-colors';
 import shell from './shell.py';
 
 const HOME_DIRECTORY = "/root";
@@ -23,6 +24,7 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
 }
 
 (async () => {
+    const isInitializing = signal(true);
     const fileTree = signal<FileTreeNode[] | null>(null);
 
     const isNativeFSMounted = signal(false);
@@ -137,43 +139,54 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
                                     handleNodeAction={handleFileTreeNodeAction}
                                 />
                             )
-                            : <i>Waiting...</i>
+                            : <i>{computed(() => isInitializing.value ? 'Waiting...' : 'Unavailable')}</i>
                     ))}
                 </div>
             </Area>
-            <footer>
-                <h2>Glasgow via WebUSB</h2>
-                <p>
-                    Experimental software, use at your own risk.
-                    All data is processed locally.
-                </p>
-            </footer>
         </>,
         document.querySelector('.main'),
     );
 
-    const xtermContainer = document.getElementById('terminal') as HTMLDivElement;
-    if (typeof WebAssembly !== "object") {
-        xtermContainer.innerText = 'WebAssembly is required but not available.';
-        return;
-    // @ts-expect-error
-    } else if (typeof WebAssembly.promising !== "function") {
-        xtermContainer.innerText = 'WebAssembly JSPI is required but not available.';
-        return;
-    } else if (typeof navigator.usb !== "object") {
-        xtermContainer.innerText = 'WebUSB is required but not available.';
-        return;
-    } else {
-        xtermContainer.innerText = '';
-    }
-
-    const xterm = new Terminal(xtermContainer);
+    const xterm = new Terminal(document.getElementById('terminal'));
     xterm.focus();
 
-    xterm.write(new TextEncoder().encode('Loading toolchain...\n'));
+    const printText = (text: string, end: string = '\n') => {
+        xterm.write(new TextEncoder().encode(text + end));
+    };
+
+    const printError = (text: string, end?: string) => {
+        printText(`${termColors.bgRed(' Error ')} ${text}`, end);
+    };
+
+    const printProgress = (text: string, end?: string) => {
+        printText(termColors.dim(text), end);
+    };
+
+    printText(termColors.bold('Glasgow via WebUSB'));
+    printText('Experimental software, use at your own risk.');
+    printText('All data is processed locally.');
+    printText('');
+
+    try {
+        if (typeof WebAssembly !== "object") {
+            throw 'WebAssembly is required but not available.';
+        // @ts-expect-error
+        } else if (typeof WebAssembly.promising !== "function") {
+            throw 'WebAssembly JSPI is required but not available.';
+        } else if (typeof navigator.usb !== "object") {
+            throw 'WebUSB is required but not available.';
+        }
+    } catch (errorText: unknown) {
+        isInitializing.value = false;
+        printError(errorText as string);
+        xterm.endSession();
+        return;
+    }
+
+    printProgress('Loading toolchain...');
     await loadToolchain();
 
-    xterm.write(new TextEncoder().encode('Loading Python...\n'));
+    printProgress('Loading Python...');
     const pyodide = await loadPyodide({
         env: { HOME: HOME_DIRECTORY },
     });
@@ -259,14 +272,16 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
 
     isNativeFSMountDisabled.value = false;
 
-    xterm.write(new TextEncoder().encode('Loading dependencies...\n'));
+    printProgress('Loading dependencies...');
     await pyodide.loadPackage([
         './whl/micropip-0.10.0-py3-none-any.whl',
         './whl/markupsafe-3.0.2-cp313-cp313-pyodide_2025_0_wasm32.whl',
         './whl/cobs-1.2.1-cp313-cp313-pyodide_2025_0_wasm32.whl',
-    ]);
+    ], {
+        messageCallback: printProgress,
+    });
 
-    xterm.write(new TextEncoder().encode('Loading Glasgow software...\n'));
+    printProgress('Loading Glasgow software...');
     await pyodide.runPythonAsync(String.raw`
         import micropip
         await micropip.install('./whl/glasgow-0.1-py3-none-any.whl')
@@ -275,5 +290,6 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
         #interactive_console()
     `);
 
+    isInitializing.value = false;
     await pyodide.runPythonAsync(shell);
 })();

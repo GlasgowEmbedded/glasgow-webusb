@@ -47,11 +47,9 @@ body {
 
 .main {
     display: grid;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr;
     grid-template-columns: 1fr 300px;
-    grid-template-areas:
-        'terminal sidebar'
-        'footer footer';
+    grid-template-areas: 'terminal sidebar';
     gap: 8px;
     padding: 8px;
     height: 100vh;
@@ -91,20 +89,6 @@ button {
 .aligned-icon {
     vertical-align: middle;
     margin-block-start: calc(1ex - 1cap);
-}
-
-footer {
-    grid-area: footer;
-    color: var(--color-text-muted);
-
-    h2 {
-        margin: 0 0 4px;
-        font-size: inherit;
-    }
-
-    p {
-        margin: 0;
-    }
 }
 
 .area {
@@ -169,11 +153,15 @@ footer {
     /* !important is used to override inline styles */
 
     .xterm {
-        padding: 4px;
+        padding: 8px;
     }
 
     .xterm-viewport {
         background-color: transparent !important;
+    }
+
+    &.session-ended :is(.xterm-helper-textarea, .xterm-cursor) {
+        display: none;
     }
 }
 
