@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
-import { classNames } from './helpers/class-names';
+import { classNames } from '../helpers/class-names';
 
-const codiconsSpriteSheetURL = new URL('../node_modules/@vscode/codicons/dist/codicon.svg', import.meta.url).href;
+const codiconsSpriteSheetURL = new URL('../../node_modules/@vscode/codicons/dist/codicon.svg', import.meta.url).href;
 
 export interface IconProps extends JSX.SVGAttributes<SVGSVGElement> {
     name: string;

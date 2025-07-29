@@ -1,12 +1,12 @@
-import { render } from 'preact';
-import { batch, computed, effect, signal } from '@preact/signals';
+import { render, options } from 'preact';
+import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
 import { loadToolchain } from './toolchain';
 import { loadPyodide } from './pyodide';
-import { Area } from './area';
+import { PanelContainer } from './components/panel';
 import { Terminal } from './terminal';
-import { TreeNode, TreeView } from './tree-view';
-import { classNames } from './helpers/class-names';
+import { type TreeNode, TreeView, type TreeViewAPI } from './components/tree-view';
+import { truthyFilter } from './helpers/truthy-filter';
 import termColors from './terminal-colors';
 import shell from './shell.py';
 
@@ -21,41 +21,32 @@ declare global {
     function signalExecutionEnd(): void;
 }
 
-interface FileTreeNode extends TreeNode<FileTreeNode> {
+interface FileTreeNode extends TreeNode {
     path: string;
 }
+
+(() => {
+    // Backport https://github.com/preactjs/preact/pull/4658
+    // Delete once a new version of Preact is released
+
+    let oldDiffHook = (options as any).__b /* _diff */;
+    (options as any).__b /* _diff */ = (vnode: any) => {
+        const isClassComponent = typeof vnode.type === 'function' && 'prototype' in vnode.type && vnode.type.prototype.render;
+        if (typeof vnode.type === 'function' && !isClassComponent && vnode.ref) {
+            vnode.props.ref = vnode.ref;
+            vnode.ref = null;
+        }
+        if (oldDiffHook) oldDiffHook(vnode);
+    };
+})();
 
 (async () => {
     const isInitializing = signal(true);
     const fileTree = signal<FileTreeNode[] | null>(null);
 
-    const isUsingWideLayout = signal(false);
-    const updateWideLayoutState = () => {
-        isUsingWideLayout.value = window.innerWidth > 600;
-    };
-    updateWideLayoutState();
-    window.addEventListener('resize', debounce(updateWideLayoutState, 50));
-
-    let fileTreeElement: HTMLElement | null;
-    const isFileTreeAreaRendered = signal(false);
-    const isFileTreeAreaShown = signal(true);
-    const showFileTree = () => {
-        batch(() => {
-            isFileTreeAreaRendered.value = true;
-            isFileTreeAreaShown.value = true;
-        });
-    };
-    const hideFileTree = () => {
-        isFileTreeAreaShown.value = false;
-        if (fileTreeElement) {
-            fileTreeElement.addEventListener('animationend', () => {
-                isFileTreeAreaRendered.value = false;
-            }, { once: true });
-        }
-    };
-
     const isNativeFSMounted = signal(false);
     const isNativeFSMountDisabled = signal(true);
+    let nativeFSMountRoot: unknown | null = null;
 
     const handleMountNativeFSClick = async () => {
         isNativeFSMountDisabled.value = true;
@@ -76,9 +67,8 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
 
             const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
-            pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
+            nativeFSMountRoot = pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
                 fileSystemHandle,
-                autoPersist: true
             }, MOUNT_DIRECTORY);
             syncFSFromBacking();
             isNativeFSMounted.value = true;
@@ -114,9 +104,14 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
         interrupt();
     };
 
-    const handleFileTreeNodeAction = (event: Event, node: FileTreeNode) => {
+    let treeViewAPI: TreeViewAPI<FileTreeNode> | null = null;
+
+    const nodeAndParentsToPath = (node: FileTreeNode | null, parents: FileTreeNode[], ...segments: string[]) =>
+        [parents.map(({ name }) => name), node && node.name, ...segments].filter(Boolean).join('/');
+
+    const handleFileTreeNodeAction = (node: FileTreeNode) => {
         // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-        let fileContents: Uint8Array = pyodide.FS.readFile(node.path);
+        let fileContents: Uint8Array<ArrayBuffer> = pyodide.FS.readFile(node.path);
         let url = URL.createObjectURL(new Blob([fileContents]));
         let element = document.createElement('a');
         element.href = url;
@@ -125,82 +120,190 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
         URL.revokeObjectURL(url);
     };
 
+    const handleNewFileCreation = (node: FileTreeNode | null, parents: FileTreeNode[], name: string, type: 'file' | 'folder') => {
+        const path = nodeAndParentsToPath(node, parents, name);
+        const absolutePath = pyodide.PATH.join(HOME_DIRECTORY, path);
+
+        if (type === 'file') {
+            pyodide.FS.mkdirTree(pyodide.PATH.dirname(absolutePath));
+            const stream = pyodide.FS.open(absolutePath, 'w+');
+            pyodide.FS.close(stream);
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.addEventListener('change', () => {
+                if (!fileInput.files || fileInput.files.length < 1) {
+                    return;
+                }
+                let file = fileInput.files[0];
+                let fileReader = new FileReader();
+                fileReader.addEventListener('loadend', () => {
+                    pyodide.FS.writeFile(absolutePath, new Uint8Array(fileReader.result as ArrayBuffer));
+                });
+                fileReader.readAsArrayBuffer(file);
+            });
+            fileInput.click();
+        }
+
+        if (type === 'folder') {
+            pyodide.FS.mkdirTree(absolutePath);
+        }
+    };
+
+    const handleFileDeletion = (node: FileTreeNode, parents: FileTreeNode[]) => {
+        if (!confirm('confirm')) {
+            return;
+        }
+
+        const path = nodeAndParentsToPath(node, parents);
+
+        const deleteFile = (path: string) => {
+            if (pyodide.FS.isDir(pyodide.FS.stat(path, true).mode)) {
+                for (const file of pyodide.FS.readdir(path)) {
+                    if (file === '.' || file === '..') {
+                        continue;
+                    }
+                    deleteFile(`${path}/${file}`);
+                }
+                pyodide.FS.rmdir(path);
+            } else {
+                pyodide.FS.unlink(path);
+            }
+        };
+        deleteFile(pyodide.PATH.join(HOME_DIRECTORY, path));
+    };
+
+    const handleFileRename = (node: FileTreeNode, parents: FileTreeNode[], newName: string) => {
+        const path = nodeAndParentsToPath(node, parents);
+        const newPath = nodeAndParentsToPath(null, parents, newName);
+
+        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
+        pyodide.FS.rename(
+            pyodide.PATH.join(HOME_DIRECTORY, path),
+            pyodide.PATH.join(HOME_DIRECTORY, newPath),
+        );
+    };
+
     render(
-        <div class={classNames('main', () => isUsingWideLayout.value && 'wide')}>
-            <Area
-                id="terminal-area"
-                class={computed(() => isUsingWideLayout.value ? 'padded' : '')}
-                name="Terminal"
-                iconName="terminal"
-                actions={computed(() => [
+        <div className="main">
+            <PanelContainer
+                panels={[
                     {
-                        name: 'Stop',
-                        iconName: 'stop-circle',
-                        disabled: !isInterruptExecutionButtonEnabled.value,
-                        handleAction: handleInterruptExecutionClick,
-                    },
-                    !isUsingWideLayout.value && {
-                        name: 'View /root',
-                        iconName: 'folder-opened',
-                        disabled: false,
-                        handleAction() {
-                            showFileTree();
-                        },
-                    },
-                    'showDirectoryPicker' in window && {
-                        name: isNativeFSMounted.value ? 'Unmount /mnt' : 'Mount /mnt',
-                        disabled: isNativeFSMountDisabled.value,
-                        handleAction: handleMountNativeFSClick,
-                    },
-                ].filter(Boolean))}
-            >
-                <div class="area-content" id="terminal" />
-            </Area>
-            {computed(() => isUsingWideLayout.value || isFileTreeAreaRendered.value ? <div
-                ref={(element) => {
-                    fileTreeElement = element;
-                    return () => {
-                        fileTreeElement = null;
-                    };
-                }}
-                id="file-tree-area"
-                class={classNames(() => !isFileTreeAreaShown.value && 'animating-out')}
-            >
-                <Area
-                    class="padded"
-                    name="/root"
-                    iconName="folder-opened"
-                    actions={computed(() => isUsingWideLayout.value ? [] : [
-                        {
-                            name: 'Close',
-                            iconName: 'close',
-                            disabled: false,
-                            handleAction() {
-                                hideFileTree();
+                        name: 'Terminal',
+                        iconName: 'terminal',
+                        className: 'terminal-panel',
+                        actions: computed(() => [
+                            {
+                                name: 'Stop',
+                                iconName: 'stop-circle',
+                                disabled: !isInterruptExecutionButtonEnabled.value,
+                                handleAction: handleInterruptExecutionClick,
                             },
-                        },
-                    ])}
-                >
-                    <div class="area-content tree">
-                        {computed(() => (
-                            fileTree.value
-                                ? (
-                                    <TreeView
-                                        nodes={fileTree.value}
-                                        emptyTreeMessage="Directory is empty"
-                                        handleNodeAction={handleFileTreeNodeAction}
-                                    />
-                                )
-                                : <i>{computed(() => isInitializing.value ? 'Waiting...' : 'Unavailable')}</i>
-                        ))}
-                    </div>
-                </Area>
-            </div> : null)}
+                            'showDirectoryPicker' in window && {
+                                name: isNativeFSMounted.value ? 'Unmount /mnt' : 'Mount /mnt',
+                                disabled: isNativeFSMountDisabled.value,
+                                handleAction: handleMountNativeFSClick,
+                            },
+                        ].filter(truthyFilter)),
+                        children: (
+                            <div class="panel-content" id="terminal" />
+                        ),
+                    },
+
+                    {
+                        name: '/root',
+                        iconName: 'folder-opened',
+                        className: 'file-tree-panel',
+                        actions: computed(() => [
+                            {
+                                name: 'Upload file',
+                                iconName: 'new-file',
+                                iconOnly: true,
+                                disabled: fileTree.value === null,
+                                handleAction() {
+                                    treeViewAPI?.createFile(null).then(({ node, parents, name }) => {
+                                        handleNewFileCreation(node, parents, name, 'file');
+                                    });
+                                },
+                            },
+                            {
+                                name: 'Create folder',
+                                iconName: 'new-folder',
+                                iconOnly: true,
+                                disabled: fileTree.value === null,
+                                handleAction() {
+                                    treeViewAPI?.createFolder(null).then(({ node, parents, name }) => {
+                                        handleNewFileCreation(node, parents, name, 'folder');
+                                    });
+                                },
+                            },
+                        ]),
+                        children: (
+                            <div class="panel-content tree">
+                                {computed(() => (
+                                    fileTree.value
+                                        ? (
+                                            <TreeView
+                                                nodes={fileTree.value}
+                                                emptyTreeMessage="Directory is empty"
+                                                actions={[
+                                                    {
+                                                        name: 'New File...',
+                                                        iconName: 'new-file',
+                                                        applicable: (node) => !node || !!node.children,
+                                                        execute: (node, _parents) => {
+                                                            treeViewAPI!.createFile(node).then(({ node, parents, name }) => {
+                                                                handleNewFileCreation(node, parents, name, 'file');
+                                                            });
+                                                        },
+                                                    },
+                                                    {
+                                                        name: 'New Folder...',
+                                                        iconName: 'new-file',
+                                                        applicable: (node) => !node || !!node.children,
+                                                        execute: (node, _parents) => {
+                                                            treeViewAPI!.createFolder(node).then(({ node, parents, name }) => {
+                                                                handleNewFileCreation(node, parents, name, 'folder');
+                                                            });
+                                                        },
+                                                    },
+                                                    {
+                                                        name: 'Download',
+                                                        iconName: 'save',
+                                                        applicable: (node) => !!node && !node.children,
+                                                        execute: (node) => handleFileTreeNodeAction(node!),
+                                                        showInline: true,
+                                                    },
+                                                    {
+                                                        name: 'Rename...',
+                                                        applicable: (node) => !!node,
+                                                        execute: (node, parents, nodeAPI) => {
+                                                            nodeAPI!.rename().then(({ newName }) => {
+                                                                handleFileRename(node!, parents, newName);
+                                                            });
+                                                        },
+                                                    },
+                                                    {
+                                                        name: 'Delete',
+                                                        applicable: (node) => !!node,
+                                                        execute: (node, parents) => handleFileDeletion(node!, parents),
+                                                    },
+                                                ]}
+                                                api={(value) => treeViewAPI = value}
+                                            />
+                                        )
+                                        : <i>{computed(() => isInitializing.value ? 'Waiting...' : 'Unavailable')}</i>
+                                ))}
+                            </div>
+                        ),
+                    },
+                ]}
+            />
         </div>,
-        document.querySelector('#app'),
+        document.querySelector('#app')!,
     );
 
-    const xterm = new Terminal(document.getElementById('terminal'));
+    const xterm = new Terminal(document.getElementById('terminal')!);
     xterm.focus();
 
     const printText = (text: string, end: string = '\n') => {
@@ -294,34 +397,90 @@ interface FileTreeNode extends TreeNode<FileTreeNode> {
         return result;
     };
 
-    globalThis.syncFSFromBacking = () => new Promise((resolve, reject) => {
-        pyodide.FS.syncfs(true, (error) => {
-            if (error !== null) {
-                console.log('[FS Error]', error);
-                reject(error);
-                return;
-            }
+    globalThis.syncFSFromBacking = async () => {
+        if (!nativeFSMountRoot) return;
+        return await new Promise((resolve, reject) => {
+            pyodide.FS.filesystems.NATIVEFS_ASYNC.syncfs((nativeFSMountRoot as any).mount, true, (error: unknown) => {
+                if (error !== null) {
+                    console.log('[FS Error]', error);
+                    reject(error);
+                    return;
+                }
 
-            resolve();
+                resolve();
+            });
         });
-    });
+    };
 
-    globalThis.syncFSToBacking = () => new Promise((resolve, reject) => {
-        pyodide.FS.syncfs(false, (error) => {
-            if (error !== null) {
-                console.log('[FS Error]', error);
-                reject(error);
-                return;
-            }
+    globalThis.syncFSToBacking = async () => {
+        if (!nativeFSMountRoot) return;
+        return await new Promise((resolve, reject) => {
+            pyodide.FS.filesystems.NATIVEFS_ASYNC.syncfs((nativeFSMountRoot as any).mount, false, (error: unknown) => {
+                if (error !== null) {
+                    console.log('[FS Error]', error);
+                    reject(error);
+                    return;
+                }
 
-            resolve();
+                resolve();
+            });
         });
-    });
+    };
+
+    const updateFileTree = () => {
+        fileTree.value = readFileTree(HOME_DIRECTORY);
+    };
+    const queueFileTreeUpdate = (() => {
+        let queued = false;
+        return () => {
+            if (queued) return;
+            setTimeout(() => {
+                queued = false;
+                updateFileTree();
+            }, 0);
+            queued = true;
+        };
+    })();
+
+    // @ts-expect-error Pyodide's FS typings are not comprehensive enough
+    let trackingDelegate: Record<string, (...args: any) => void> = pyodide.FS.trackingDelegate;
+    trackingDelegate['onMakeDirectory'] = (path: string, mode: number) => {
+        if (path.startsWith(HOME_DIRECTORY)) {
+            queueFileTreeUpdate();
+        }
+    };
+    trackingDelegate['onMakeSymlink'] = (oldPath: string, newPath: string) => {
+        if (newPath.startsWith(HOME_DIRECTORY)) {
+            queueFileTreeUpdate();
+        }
+    };
+    trackingDelegate['onMovePath'] = (oldPath: string, newPath: string) => {
+        if (oldPath.startsWith(HOME_DIRECTORY) || newPath.startsWith(HOME_DIRECTORY)) {
+            queueFileTreeUpdate();
+        }
+    };
+    trackingDelegate['onDeletePath'] = (path: string) => {
+        if (path.startsWith(HOME_DIRECTORY)) {
+            queueFileTreeUpdate();
+        }
+    };
+    trackingDelegate['onCloseFile'] = (path: string) => {
+        if (path.startsWith(HOME_DIRECTORY)) {
+            queueFileTreeUpdate();
+        }
+    };
+
+    Object.assign(window, { pyodide });
 
     pyodide.FS.mkdirTree(HOME_DIRECTORY);
-    pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
-    syncFSFromBacking().then(() => {
-        fileTree.value = readFileTree('/root');
+    const homeMountRoot = pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
+    pyodide.FS.filesystems.IDBFS.syncfs(homeMountRoot.mount, true, (error: unknown) => {
+        if (error !== null) {
+            console.log('[FS Error]', error);
+            return;
+        }
+
+        updateFileTree();
     });
 
     isNativeFSMountDisabled.value = false;

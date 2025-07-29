@@ -27,6 +27,10 @@ export class Terminal {
             scrollback: 10000,
             screenReaderMode: true,
 
+            // Read the desired font-family and font-size from CSS and apply it here.
+            // We cannot override these properties on .xterm-rows in CSS
+            // because xterm.js relies on these for calculating other metrics
+            // like line-height.
             fontFamily: parentContainerStyles.fontFamily,
             fontSize: Number(parentContainerStyles.fontSize.replace(/px$/, '')),
         });
@@ -48,7 +52,9 @@ export class Terminal {
         this.#ptyHandle = ptyHandle;
 
         this.#readBuffer = [];
-        this.#readPromise = new Promise((resolve, _reject) => this.#readResolve = resolve);
+        const { promise: readPromise, resolve: readResolve } = Promise.withResolvers<void>();
+        this.#readPromise = readPromise;
+        this.#readResolve = readResolve;
         ptyHandle.onReadable(() => {
             this.#readBuffer.splice(this.#readBuffer.length, 0, ...ptyHandle.read());
             this.#readResolve();

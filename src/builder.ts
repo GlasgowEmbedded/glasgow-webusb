@@ -1,4 +1,4 @@
-import { Tree } from '@yowasp/runtime';
+import type { Tree } from '@yowasp/runtime';
 
 import * as builderProto from './builder/proto';
 

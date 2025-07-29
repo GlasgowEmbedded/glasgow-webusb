@@ -35,6 +35,7 @@
     "xterm-pty": "^0.11.1"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.7.3",
     "@preact/signals": "^2.2.1",
     "@types/lodash": "^4.17.20",
     "@vscode/codicons": "^0.0.38",

@@ -1,4 +1,4 @@
-import { Tree } from '@yowasp/runtime';
+import type { Tree } from '@yowasp/runtime';
 
 export interface PackagesMessage {
     type: 'packages',

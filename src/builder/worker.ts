@@ -1,4 +1,6 @@
-import { Tree, Application, Exit } from '@yowasp/runtime';
+/// <reference lib="WebWorker" />
+
+import { type Tree, Application, Exit } from '@yowasp/runtime';
 import * as yosys from '@yowasp/yosys';
 import * as nextpnrIce40 from '@yowasp/nextpnr-ice40';
 
@@ -68,13 +70,13 @@ async function executeScript(
     for (const scriptLine of script.commands) {
         writeBuffered(new TextEncoder().encode(`+ ${scriptLine.join(' ')}\n`));
         const [name, ...args] = scriptLine;
-        const command = (await commands).get(name);
+        const command = (await commands).get(name)!;
         try {
             files = await command.run(args, files, {
                 stdout: writeBuffered,
                 stderr: writeBuffered,
                 decodeASCII: false,
-            });
+            })!;
         } catch (error) {
             if (error instanceof command.Exit) {
                 return { code: error.code, files: error.files };
