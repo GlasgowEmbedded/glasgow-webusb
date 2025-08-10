@@ -18,11 +18,15 @@
     "watch": "node build.mjs watch",
     "serve": "node build.mjs serve"
   },
-  "devDependencies": {
+  "dependencies": {
     "@chialab/esbuild-plugin-html": "^0.18.2",
     "@chialab/esbuild-plugin-meta-url": "^0.18.2",
+    "@floating-ui/dom": "^1.7.3",
+    "@preact/signals": "^2.2.1",
+    "@types/lodash": "^4.17.20",
     "@types/w3c-web-usb": "^1.0.10",
     "@types/wicg-file-system-access": "^2023.10.6",
+    "@vscode/codicons": "^0.0.38",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
@@ -31,15 +35,9 @@
     "@yowasp/yosys": "release",
     "esbuild": "^0.25.8",
     "eslint": "^9.31.0",
+    "lodash": "^4.17.21",
+    "preact": "^10.26.9",
     "typescript-eslint": "^8.37.0",
     "xterm-pty": "^0.11.1"
-  },
-  "dependencies": {
-    "@floating-ui/dom": "^1.7.3",
-    "@preact/signals": "^2.2.1",
-    "@types/lodash": "^4.17.20",
-    "@vscode/codicons": "^0.0.38",
-    "lodash": "^4.17.21",
-    "preact": "^10.26.9"
   }
 }
