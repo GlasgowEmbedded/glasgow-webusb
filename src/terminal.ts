@@ -38,6 +38,9 @@ export class Terminal {
         const fitAddon = new FitAddon();
         xterm.loadAddon(fitAddon);
 
+        // This will also call fitAddon.fit() before the browser renders the page,
+        // saving us the need to call it ourselves for the first time.
+        // It is important that this occurs after we load the pty addon.
         const resizeObserver = new ResizeObserver(() => fitAddon.fit());
         resizeObserver.observe(element);
 
@@ -45,10 +48,6 @@ export class Terminal {
         xterm.loadAddon(ptyAddon);
         this.#ptyAddon = ptyAddon;
         this.#ptyHandle = ptyHandle;
-
-        // Resize the terminal after loading the pty plugin
-        // so that it is notified of the size change.
-        fitAddon.fit();
     }
 
     get columns() {
