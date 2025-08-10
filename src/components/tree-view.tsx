@@ -474,7 +474,7 @@ interface TreeViewProps<N extends TreeNode> {
     nodes: N[];
     emptyTreeMessage?: string;
     actions: TreeNodeAction<N>[];
-    api: Ref<TreeViewAPI>;
+    api: Ref<TreeViewAPI<N>>;
 }
 
 export const TreeView = <N extends TreeNode>({ nodes, emptyTreeMessage, actions, ...other }: TreeViewProps<N>) => {

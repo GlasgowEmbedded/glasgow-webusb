@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "noEmit": true,
         "skipLibCheck": true,
         "jsx": "react-jsx",
         "jsxImportSource": "preact",
@@ -13,6 +14,6 @@
         ],
         "strict": true,
         "verbatimModuleSyntax": true,
-        "noImplicitAny": true
-    },
+        "noImplicitAny": true,
+    }
 }

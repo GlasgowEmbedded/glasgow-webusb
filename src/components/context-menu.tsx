@@ -91,7 +91,7 @@ export const ContextMenu = ({ position, items, onCancel }: ContextMenuProps) => 
         } else {
             elementRef.current?.focus();
         }
-    })
+    });
 
     useLayoutEffect(() => {
         if (needToRecalculatePosition.value && elementRef.current) {
