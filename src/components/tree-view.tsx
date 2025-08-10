@@ -24,32 +24,32 @@ interface TreeNodeAction<N extends TreeNode> {
 }
 
 export interface TreeViewAPI<N extends TreeNode> {
-    createFile(underNode: TreeNode | null): Promise<{ node: N | null; parents: N[]; name: string }>;
-    createFolder(underNode: TreeNode | null): Promise<{ node: N | null; parents: N[]; name: string }>;
+    createFile(options: {
+        underNode: TreeNode | null;
+        execute(options: { node: N | null; parents: N[]; name: string; dryRun: boolean; }): Promise<void>;
+    }): void;
+
+    createFolder(options: {
+        underNode: TreeNode | null;
+        execute(options: { node: N | null; parents: N[]; name: string; dryRun: boolean; }): Promise<void>;
+    }): void;
 }
 
 interface TreeNodeAPI {
-    rename(): Promise<{ newName: string }>;
+    rename(options: {
+        execute(options: { newName: string; dryRun: boolean; }): Promise<void>;
+    }): void;
 }
 
 interface TreeRootContextValue {
     rootNodes: TreeNode[];
     nodeElements: Map<TreeNode, HTMLElement>;
     currentlyFocusableNode: Signal<TreeNode | null>;
-    creatingNewNode: ReadonlySignal<
-        null | ({
-            under: TreeNode | null;
-            type: 'file' | 'folder';
-        } & PromiseWithResolvers<{
-            node: TreeNode | null;
-            parents: TreeNode[];
-            name: string;
-        }>)
+    creatingNewNode: Signal<
+        null | (Parameters<TreeViewAPI<TreeNode>['createFile']>[0] & { type: 'file' | 'folder'; })
     >;
     actions: TreeNodeAction<TreeNode>[];
     focus(node: TreeNode | null): void;
-    onNewNodeCreation(node: TreeNode | null, parents: TreeNode[], name: string): void;
-    cancelNewNodeCreation(): void;
 }
 
 const TreeRootContext = createContext<TreeRootContextValue | null>(null);
@@ -57,30 +57,61 @@ const TreeRootContext = createContext<TreeRootContextValue | null>(null);
 interface TreeNodeCreationProps {
     creatingType: 'file' | 'folder';
     parents: TreeNode[];
-    onConfirm: (name: string) => void;
-    onCancel: () => void;
 }
 
-const TreeNodeCreationForm = ({ creatingType, parents, onConfirm, onCancel }: TreeNodeCreationProps) => {
+const TreeNodeCreationForm = ({ creatingType, parents }: TreeNodeCreationProps) => {
+    const treeRootContext = useContext(TreeRootContext);
+    if (treeRootContext === null) {
+        throw new Error('TreeRootContext must be provided');
+    }
+
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const handleBlur = useCallback((event: FocusEvent) => {
-        onCancel();
+    const execute = useCallback(async (form: HTMLFormElement, dryRun: boolean) => {
+        const nameInput = form.elements.namedItem('name') as HTMLInputElement;
+        const name = nameInput.value.trim();
+        if (name === '') {
+            nameInput.setCustomValidity('');
+            return;
+        }
+        try {
+            await treeRootContext.creatingNewNode.value!.execute({
+                node: parents.at(-1) ?? null,
+                parents: parents.slice(0, -1),
+                name: name,
+                dryRun: dryRun,
+            });
+            nameInput.setCustomValidity('');
+            if (dryRun)
+                return;
+            treeRootContext.creatingNewNode.value = null;
+        } catch (e) {
+            nameInput.setCustomValidity(String(e));
+        }
+    }, [parents]);
+
+    const cancel = useCallback(() => {
+        treeRootContext.creatingNewNode.value = null;
+    }, []);
+
+    const handleBlur = useCallback((_event: FocusEvent) => {
+        cancel();
     }, []);
 
     const handleKeyDown = useCallback((event: KeyboardEvent) => {
         if (event.key === 'Escape') {
-            onCancel();
+            cancel();
         }
+    }, []);
+
+    const handleInput = useCallback((event: InputEvent) => {
+        const form = (event.target as HTMLInputElement).form!;
+        execute(form, true);
     }, []);
 
     const handleSubmit = useCallback((event: SubmitEvent) => {
         event.preventDefault();
-        let nameInput = (event.target as HTMLFormElement).elements.namedItem('name') as HTMLInputElement;
-        let name = nameInput.value.trim();
-        if (!['', '.', '..'].includes(name) && !name.includes('/')) {
-            onConfirm(name);
-        }
+        execute(event.target as HTMLFormElement, false);
     }, []);
 
     useLayoutEffect(() => {
@@ -102,6 +133,7 @@ const TreeNodeCreationForm = ({ creatingType, parents, onConfirm, onCancel }: Tr
                     autocomplete="off"
                     onBlur={handleBlur}
                     onKeyDown={handleKeyDown}
+                    onInput={handleInput}
                 />
             </div>
         </form>
@@ -130,7 +162,7 @@ const TreeList = ({ nodes, parents, ref }: TreeListProps) => {
         if (creatingNewNode === null) {
             return nodes;
         }
-        if (creatingNewNode.under !== (parents.at(-1) ?? null)) {
+        if (creatingNewNode.underNode !== (parents.at(-1) ?? null)) {
             return nodes;
         }
         if (creatingNewNode.type === 'folder') {
@@ -221,12 +253,6 @@ const TreeList = ({ nodes, parents, ref }: TreeListProps) => {
                             <TreeNodeCreationForm
                                 creatingType={node.creatingType}
                                 parents={parents}
-                                onConfirm={(name) => {
-                                    treeRootContext.onNewNodeCreation(parents.at(-1) ?? null, parents.slice(0, -1), name);
-                                }}
-                                onCancel={() => {
-                                    treeRootContext.cancelNewNodeCreation();
-                                }}
                             />
                         )
                         : <TreeNodeView node={node} parents={parents} />
@@ -265,10 +291,10 @@ const TreeNodeView = ({ node, parents, ...other }: TreeNodeViewProps) => {
     const isOpened = useSignal(false);
     const wasLastFocused = useSignal(false);
     const contextMenuOpenAtPosition = useSignal<TwoDim | null>(null);
-    const currentlyRenaming = useSignal<PromiseWithResolvers<{ newName: string; }> | null>(null);
+    const currentlyRenaming = useSignal<Parameters<TreeNodeAPI['rename']>[0] | null>(null);
 
     useSignalEffect(() => {
-        if (treeRootContext.creatingNewNode.value?.under === node) {
+        if (treeRootContext.creatingNewNode.value?.underNode === node) {
             isOpened.value = true;
         }
     });
@@ -323,41 +349,50 @@ const TreeNodeView = ({ node, parents, ...other }: TreeNodeViewProps) => {
         contextMenuOpenAtPosition.value = null;
     }, []);
 
-    const saveNewName = useCallback((input: HTMLInputElement) => {
-        if (!currentlyRenaming.value) {
+    const saveNewName = useCallback(async (input: HTMLInputElement, dryRun: boolean) => {
+        const newName = input.value.trim();
+        if (newName === '') {
+            input.setCustomValidity('');
             return;
         }
-        const newName = input.value.trim();
-        if (!['', '.', '..'].includes(newName) && !newName.includes('/')) {
-            currentlyRenaming.value.resolve({ newName });
+        try {
+            await currentlyRenaming.value!.execute({
+                newName: newName,
+                dryRun: dryRun,
+            });
+            input.setCustomValidity('');
+            if (dryRun)
+                return;
             currentlyRenaming.value = null;
+        } catch (e) {
+            input.setCustomValidity(String(e));
+            input.reportValidity();
         }
-    }, [node]);
+    }, []);
 
     const handleInputBlur = useCallback((event: FocusEvent) => {
-        if (!currentlyRenaming.value) {
-            return;
-        }
-        saveNewName(event.target as HTMLInputElement);
+        saveNewName(event.target as HTMLInputElement, false);
     }, [saveNewName]);
 
     const handleInputKeyDown = useCallback((event: KeyboardEvent) => {
         event.stopPropagation();
         if (event.key === 'Enter') {
             event.preventDefault();
-            saveNewName(event.target as HTMLInputElement);
+            saveNewName(event.target as HTMLInputElement, false);
         }
         if (event.key === 'Escape') {
             event.preventDefault();
-            currentlyRenaming.value?.reject('Canceled by user');
             currentlyRenaming.value = null;
         }
     }, [saveNewName]);
 
+    const handleInputInput = useCallback((event: InputEvent) => {
+        saveNewName(event.target as HTMLInputElement, true);
+    }, [saveNewName]);
+
     const treeNodeAPI: TreeNodeAPI = {
-        rename() {
-            currentlyRenaming.value = Promise.withResolvers();
-            return currentlyRenaming.value.promise;
+        rename(options) {
+            currentlyRenaming.value = options;
         },
     };
 
@@ -414,6 +449,7 @@ const TreeNodeView = ({ node, parents, ...other }: TreeNodeViewProps) => {
                             onBlur={handleInputBlur}
                             onClick={e => e.stopPropagation()}
                             onKeyDown={handleInputKeyDown}
+                            onInput={handleInputInput}
                         />
                     )}
                 </Show>
@@ -499,16 +535,6 @@ export const TreeView = <N extends TreeNode>({ nodes, emptyTreeMessage, actions,
                 rootListRef.current?.focus();
             }
         },
-
-        onNewNodeCreation(node, parents, name) {
-            creatingNewNode.value?.resolve({ node, parents, name });
-            creatingNewNode.value = null;
-        },
-
-        cancelNewNodeCreation() {
-            creatingNewNode.value?.reject('Canceled by user');
-            creatingNewNode.value = null;
-        },
     }) satisfies TreeRootContextValue, [
         nodes,
         currentlyFocusableNode,
@@ -518,14 +544,12 @@ export const TreeView = <N extends TreeNode>({ nodes, emptyTreeMessage, actions,
     ]);
 
     const api = useMemo(() => ({
-        createFile(underNode) {
-            creatingNewNode.value = { under: underNode ?? currentlyFocusableNode.value, type: 'file', ...Promise.withResolvers() };
-            return creatingNewNode.value.promise as ReturnType<TreeViewAPI<N>['createFile']>;
+        createFile(options) {
+            creatingNewNode.value = { ...options, type: 'file' };
         },
 
-        createFolder(underNode) {
-            creatingNewNode.value = { under: underNode ?? currentlyFocusableNode.value, type: 'folder', ...Promise.withResolvers() };
-            return creatingNewNode.value.promise as ReturnType<TreeViewAPI<N>['createFolder']>;
+        createFolder(options) {
+            creatingNewNode.value = { ...options, type: 'folder' };
         },
     }) satisfies TreeViewAPI<N>, [treeRootContextValue, currentlyFocusableNode]);
 

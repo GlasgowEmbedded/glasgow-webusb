@@ -128,9 +128,27 @@ interface FileTreeNode extends TreeNode {
         URL.revokeObjectURL(url);
     };
 
-    const handleNewFileCreation = (node: FileTreeNode | null, parents: FileTreeNode[], name: string, type: 'file' | 'folder') => {
+    const handleNewFileCreation = (node: FileTreeNode | null, parents: FileTreeNode[], name: string, type: 'file' | 'folder', dryRun: boolean) => {
+        if (['', '.', '..'].includes(name)) {
+            throw 'The file name must not be . or ..';
+        }
+        if (name.includes('/')) {
+            throw 'The file name must not include a slash';
+        }
+
         const path = nodeAndParentsToPath(node, parents, name);
         const absolutePath = pyodide.PATH.join(HOME_DIRECTORY, path);
+
+        let stat;
+        try {
+            stat = pyodide.FS.stat(absolutePath, true);
+        } catch (e) {}
+        if (stat) {
+            throw `A ${pyodide.FS.isDir(stat.mode) ? 'folder' : 'file'} with the same name already exists`;
+        }
+
+        if (dryRun)
+            return;
 
         if (type === 'file') {
             pyodide.FS.mkdirTree(pyodide.PATH.dirname(absolutePath));
@@ -181,15 +199,30 @@ interface FileTreeNode extends TreeNode {
         deleteFile(pyodide.PATH.join(HOME_DIRECTORY, path));
     };
 
-    const handleFileRename = (node: FileTreeNode, parents: FileTreeNode[], newName: string) => {
-        const path = nodeAndParentsToPath(node, parents);
-        const newPath = nodeAndParentsToPath(null, parents, newName);
+    const handleFileRename = (node: FileTreeNode, parents: FileTreeNode[], newName: string, dryRun: boolean) => {
+        if (['', '.', '..'].includes(newName)) {
+            throw 'The file name must not be . or ..';
+        }
+        if (newName.includes('/')) {
+            throw 'The file name must not include a slash';
+        }
+
+        const path = pyodide.PATH.join(HOME_DIRECTORY, nodeAndParentsToPath(node, parents));
+        const newPath = pyodide.PATH.join(HOME_DIRECTORY, nodeAndParentsToPath(null, parents, newName));
+
+        let stat;
+        try {
+            stat = pyodide.FS.stat(newPath, true);
+        } catch (e) {}
+        if (stat && path !== newPath) {
+            throw `A ${pyodide.FS.isDir(stat.mode) ? 'folder' : 'file'} with the same name already exists`;
+        }
+
+        if (dryRun)
+            return;
 
         // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-        pyodide.FS.rename(
-            pyodide.PATH.join(HOME_DIRECTORY, path),
-            pyodide.PATH.join(HOME_DIRECTORY, newPath),
-        );
+        pyodide.FS.rename(path, newPath);
     };
 
     render(
@@ -230,8 +263,11 @@ interface FileTreeNode extends TreeNode {
                                 iconOnly: true,
                                 disabled: fileTree.value === null,
                                 handleAction() {
-                                    treeViewAPI?.createFile(null).then(({ node, parents, name }) => {
-                                        handleNewFileCreation(node, parents, name, 'file');
+                                    treeViewAPI?.createFile({
+                                        underNode: null,
+                                        async execute({ node, parents, name, dryRun }) {
+                                            handleNewFileCreation(node, parents, name, 'file', dryRun);
+                                        },
                                     });
                                 },
                             },
@@ -241,8 +277,11 @@ interface FileTreeNode extends TreeNode {
                                 iconOnly: true,
                                 disabled: fileTree.value === null,
                                 handleAction() {
-                                    treeViewAPI?.createFolder(null).then(({ node, parents, name }) => {
-                                        handleNewFileCreation(node, parents, name, 'folder');
+                                    treeViewAPI?.createFolder({
+                                        underNode: null,
+                                        async execute({ node, parents, name, dryRun }) {
+                                            handleNewFileCreation(node, parents, name, 'folder', dryRun);
+                                        },
                                     });
                                 },
                             },
@@ -261,8 +300,11 @@ interface FileTreeNode extends TreeNode {
                                                         iconName: 'new-file',
                                                         applicable: (node) => !node || !!node.children,
                                                         execute: (node, _parents) => {
-                                                            treeViewAPI!.createFile(node).then(({ node, parents, name }) => {
-                                                                handleNewFileCreation(node, parents, name, 'file');
+                                                            treeViewAPI?.createFile({
+                                                                underNode: node,
+                                                                async execute({ node, parents, name, dryRun }) {
+                                                                    handleNewFileCreation(node, parents, name, 'file', dryRun);
+                                                                },
                                                             });
                                                         },
                                                     },
@@ -271,8 +313,11 @@ interface FileTreeNode extends TreeNode {
                                                         iconName: 'new-file',
                                                         applicable: (node) => !node || !!node.children,
                                                         execute: (node, _parents) => {
-                                                            treeViewAPI!.createFolder(node).then(({ node, parents, name }) => {
-                                                                handleNewFileCreation(node, parents, name, 'folder');
+                                                            treeViewAPI?.createFolder({
+                                                                underNode: node,
+                                                                async execute({ node, parents, name, dryRun }) {
+                                                                    handleNewFileCreation(node, parents, name, 'folder', dryRun);
+                                                                },
                                                             });
                                                         },
                                                     },
@@ -287,8 +332,10 @@ interface FileTreeNode extends TreeNode {
                                                         name: 'Rename...',
                                                         applicable: (node) => !!node,
                                                         execute: (node, parents, nodeAPI) => {
-                                                            nodeAPI!.rename().then(({ newName }) => {
-                                                                handleFileRename(node!, parents, newName);
+                                                            nodeAPI!.rename({
+                                                                async execute({ newName, dryRun }) {
+                                                                    handleFileRename(node!, parents, newName, dryRun);
+                                                                },
                                                             });
                                                         },
                                                     },
