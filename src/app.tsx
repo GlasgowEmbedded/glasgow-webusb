@@ -14,6 +14,8 @@ const HOME_DIRECTORY = "/root";
 const MOUNT_DIRECTORY = "/mnt";
 
 declare global {
+    function terminalColumns(): number;
+
     function syncFSFromBacking(): Promise<void>;
     function syncFSToBacking(): Promise<void>;
 
@@ -312,6 +314,10 @@ interface FileTreeNode extends TreeNode {
 
     const xterm = new Terminal(document.getElementById('terminal')!);
     xterm.focus();
+
+    globalThis.terminalColumns = () => {
+        return xterm.columns;
+    };
 
     const printText = (text: string, end: string = '\n') => {
         xterm.write(new TextEncoder().encode(text + end));

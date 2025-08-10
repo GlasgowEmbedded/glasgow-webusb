@@ -18,8 +18,7 @@ Navigate to http://127.0.0.1:8020/. (WebUSB only works on secure origins, so mak
     - https://github.com/pyodide/pyodide/issues/5782
     - https://github.com/python/cpython/pull/136822
 - REPL doesn't have line editing (we should use Pyrepl instead of `prompt()` and cooked terminal, but see below)
-- Pyrepl is broken:
-    - https://github.com/python/cpython/pull/136758
-- No termios integration between Pyodide and Xterm
-    - `COLUMNS` isn't set properly, etc
-- Setting stdin to be a tty is broken for some reason
+    - Pyrepl is broken:
+        - https://github.com/python/cpython/pull/136758
+    - Setting stdin to be a tty is broken for some reason
+        - No termios integration between Pyodide and Xterm

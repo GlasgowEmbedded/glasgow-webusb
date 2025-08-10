@@ -1,4 +1,5 @@
 import js
+import os
 import sys
 import shlex
 import asyncio
@@ -14,6 +15,7 @@ while failures < 3:
         js.setInterruptFuture(to_js(interrupt_fut))
         command = input("\n> glasgow ")
         sys.argv = ["glasgow", *shlex.split(command)]
+        os.environ["COLUMNS"] = str(js.terminalColumns())
         await js.syncFSFromBacking()
         js.signalExecutionStart()
         try:

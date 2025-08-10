@@ -61,6 +61,10 @@ export class Terminal {
         });
     }
 
+    get columns() {
+        return this.#xterm.cols;
+    }
+
     focus() {
         this.#xterm.focus();
     }
