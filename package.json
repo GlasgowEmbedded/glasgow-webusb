@@ -17,7 +17,7 @@
     "minify": "node build.mjs minify",
     "watch": "node build.mjs watch",
     "serve": "node build.mjs serve",
-    "check": "tsc --project src/tsconfig.json && eslint --fix"
+    "check": "tsc --project src/tsconfig.json && tsc --project src/builder/tsconfig.json && eslint --fix"
   },
   "dependencies": {
     "@chialab/esbuild-plugin-html": "^0.18.2",

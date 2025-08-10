@@ -1,5 +1,3 @@
-/// <reference lib="WebWorker" />
-
 import { type Tree, Application, Exit } from '@yowasp/runtime';
 import * as yosys from '@yowasp/yosys';
 import * as nextpnrIce40 from '@yowasp/nextpnr-ice40';

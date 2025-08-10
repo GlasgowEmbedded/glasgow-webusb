@@ -1,6 +1,6 @@
 import type { Tree } from '@yowasp/runtime';
 
-import * as builderProto from './proto';
+import * as builderProto from './builder/proto';
 
 export class Builder {
     #worker: Worker;
@@ -8,7 +8,7 @@ export class Builder {
     #packages: Promise<{ [name: string]: string }>;
 
     constructor() {
-        const workerURL = new URL('./worker.ts', import.meta.url);
+        const workerURL = new URL('./builder/worker.ts', import.meta.url);
         this.#worker = new Worker(workerURL, { type: 'module' });
         this.#busy = true;
         this.#packages = new Promise((resolve, reject) => {
