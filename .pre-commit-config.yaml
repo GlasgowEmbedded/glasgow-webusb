@@ -1,0 +1,38 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+# See https://pre-commit.ci/ for continuous integration
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-merge-conflict
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+- repo: https://gitlab.com/bmares/check-json5
+  rev: v1.0.0
+  hooks:
+  - id: check-json5
+- repo: local
+  hooks:
+  - id: eslint
+    name: eslint
+    language: node
+    entry: npm exec -- eslint
+    types: [file]
+    files: \.[jt]sx?$
+    args: [--fix]
+  - id: tsc
+    name: tsc
+    language: node
+    entry: npm exec -- tsc
+    types: [file]
+    files: \.[jt]sx?$
+    pass_filenames: false
+    args: [--project, src/tsconfig.json]
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] Automatic code style fixes.
+
+    For more information, see https://pre-commit.ci.
