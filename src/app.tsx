@@ -2,7 +2,7 @@ import { render, options } from 'preact';
 import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
 import { loadToolchain } from './toolchain';
-import { loadPyodide } from './pyodide';
+import { loadPyodide, type PyProxy } from './pyodide';
 import { PanelContainer } from './components/panel';
 import { Terminal } from './terminal';
 import { type TreeNode, TreeView, type TreeViewAPI } from './components/tree-view';
@@ -19,6 +19,7 @@ declare global {
 
     function signalExecutionStart(): void;
     function signalExecutionEnd(): void;
+    function setInterruptFuture(future: any): void;
 }
 
 interface FileTreeNode extends TreeNode {
@@ -99,7 +100,13 @@ interface FileTreeNode extends TreeNode {
         isCurrentlyExecutingCommand.value = false;
     };
 
+    let interruptFuture: PyProxy | undefined;
+    globalThis.setInterruptFuture = (future) => {
+        interruptFuture = future;
+    };
+
     const handleInterruptExecutionClick = () => {
+        printText(termColors.reset('^C'), '');
         interrupt();
     };
 
@@ -349,8 +356,20 @@ interface FileTreeNode extends TreeNode {
     });
 
     const interruptBuffer = new Uint8Array(new ArrayBuffer(1));
-    const interrupt = () => { interruptBuffer[0] = 2; };
     pyodide.setInterruptBuffer(interruptBuffer);
+
+    const pyKeyboardInterrupt = pyodide.globals.get("KeyboardInterrupt");
+    const interrupt = () => {
+        if (interruptFuture !== undefined && !interruptFuture.done()) {
+            // raise `KeyboardInterrupt` exception within Python webloop on next iteration;
+            // this will interrupt async I/O (but not stdin reads or long running computations).
+            interruptFuture.set_exception(pyKeyboardInterrupt());
+        } else {
+             // raise SIGINT signal within Python interpreter on next PyErr_CheckSignals() call;
+             // this will interrupt long running computations (but not async I/O or stdin reads)
+            interruptBuffer[0] = 2;
+        }
+    };
     xterm.onInterrupt(interrupt);
 
     const conoutHandler = {

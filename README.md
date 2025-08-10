@@ -23,5 +23,3 @@ Navigate to http://127.0.0.1:8020/. (WebUSB only works on secure origins, so mak
 - No termios integration between Pyodide and Xterm
     - `COLUMNS` isn't set properly, etc
 - Setting stdin to be a tty is broken for some reason
-- Some sort of UI chrome, including:
-    - A button to interrupt execution for people who can't type Ctrl+C
