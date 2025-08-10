@@ -369,6 +369,9 @@ body {
 
             .tree-node-name {
                 grid-column: 3;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
 
                 &:is(input) {
                     margin: 0 -1px;
