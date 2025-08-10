@@ -151,7 +151,7 @@ interface FileTreeNode extends TreeNode {
     };
 
     const handleFileDeletion = (node: FileTreeNode, parents: FileTreeNode[]) => {
-        if (!confirm('confirm')) {
+        if (!confirm(`Are you sure you want to delete ${node.children ? 'folder' : 'file'} "${node.name}"? This operation is irreversible.`)) {
             return;
         }
 
