@@ -32,6 +32,7 @@ const options = {
         'child_process', // pyodide
         'ws', // pyodide
     ],
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.css', '.json'],
     target: 'es2021',
     format: 'esm',
     sourcemap: (mode === 'minify'),

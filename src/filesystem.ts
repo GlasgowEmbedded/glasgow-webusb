@@ -19,29 +19,28 @@ export class GlasgowFileSystem {
     subscribeToHomeUpdates(callback: () => void) {
         this.#homeUpdateCallback = debounce(callback, 0);
 
-        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-        let trackingDelegate: Record<string, (...args: any) => void> = this.#pyodide.FS.trackingDelegate;
-        trackingDelegate['onMakeDirectory'] = (path: string, mode: number) => {
+        let trackingDelegate = this.#pyodide.FS.trackingDelegate;
+        trackingDelegate.onMakeDirectory = (path: string, mode: number) => {
             if (path.startsWith(HOME_DIRECTORY)) {
                 this.#homeUpdateCallback?.();
             }
         };
-        trackingDelegate['onMakeSymlink'] = (oldPath: string, newPath: string) => {
+        trackingDelegate.onMakeSymlink = (oldPath: string, newPath: string) => {
             if (newPath.startsWith(HOME_DIRECTORY)) {
                 this.#homeUpdateCallback?.();
             }
         };
-        trackingDelegate['onMovePath'] = (oldPath: string, newPath: string) => {
+        trackingDelegate.onMovePath = (oldPath: string, newPath: string) => {
             if (oldPath.startsWith(HOME_DIRECTORY) || newPath.startsWith(HOME_DIRECTORY)) {
                 this.#homeUpdateCallback?.();
             }
         };
-        trackingDelegate['onDeletePath'] = (path: string) => {
+        trackingDelegate.onDeletePath = (path: string) => {
             if (path.startsWith(HOME_DIRECTORY)) {
                 this.#homeUpdateCallback?.();
             }
         };
-        trackingDelegate['onCloseFile'] = (path: string) => {
+        trackingDelegate.onCloseFile = (path: string) => {
             if (path.startsWith(HOME_DIRECTORY)) {
                 this.#homeUpdateCallback?.();
             }
@@ -71,7 +70,7 @@ export class GlasgowFileSystem {
                 if (a < b) return -1;
                 if (a > b) return 1;
                 return 0;
-            }
+            };
 
             let result = 0;
             if (result === 0) result = compare(Number(!!b.children), Number(!!a.children));
@@ -82,7 +81,6 @@ export class GlasgowFileSystem {
     }
 
     readFile(path: string) {
-        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
         return this.#pyodide.FS.readFile(path) as Uint8Array<ArrayBuffer>;
     };
 
@@ -173,13 +171,10 @@ export class GlasgowFileSystem {
                     }
                     duplicate(this.#pyodide.PATH.join(path, file), this.#pyodide.PATH.join(newPath, file));
                 }
-            // @ts-expect-error Pyodide's typings -_-
             } else if (this.#pyodide.FS.isLink(stat.mode)) {
-                // @ts-expect-error Pyodide's typings -_-
                 const link = this.#pyodide.FS.readlink(path);
                 this.#pyodide.FS.symlink(link, newPath);
             } else {
-                // @ts-expect-error Pyodide's typings -_-
                 const contents = this.#pyodide.FS.readFile(path);
                 this.#pyodide.FS.writeFile(newPath, contents);
             }
@@ -196,7 +191,6 @@ export class GlasgowFileSystem {
         if (dryRun)
             return;
 
-        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
         this.#pyodide.FS.rename(path, newPath);
     }
 

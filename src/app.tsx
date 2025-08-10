@@ -20,6 +20,10 @@ import shell from './shell.py';
 const GLASGOW_WHEEL_URL = "https://glasgow-embedded.org/latest/dist/glasgow-0.1.dev0-py3-none-any.whl";
 
 declare global {
+    namespace WebAssembly {
+        const promising: unknown;
+    }
+
     function terminalColumns(): number;
 
     function syncFSFromBacking(): Promise<void>;
@@ -338,7 +342,6 @@ declare global {
     try {
         if (typeof WebAssembly !== "object") {
             throw 'WebAssembly is required but not available.';
-        // @ts-expect-error
         } else if (typeof WebAssembly.promising !== "function") {
             throw 'WebAssembly JSPI is required but not available.';
         } else if (typeof navigator.usb !== "object") {
@@ -390,10 +393,8 @@ declare global {
 
     pyodide.FS.closeStream(0);
     pyodide.FS.unlink("/dev/stdin");
-    // @ts-expect-error
     pyodide.FS.createAsyncInputDevice("/dev", "stdin", () => xterm.read());
     const stdinStream = pyodide.FS.open("/dev/stdin", "r");
-    // @ts-expect-error
     if (stdinStream.fd !== 0) throw "stdin fd not zero";
     // broken:
     // stdinStream.tty = { ops: {} };
