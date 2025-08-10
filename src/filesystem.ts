@@ -67,7 +67,16 @@ export class GlasgowFileSystem {
             result.push(node);
         }
         result.sort((a, b) => {
-            return Number(!!b.children) - Number(!!a.children);
+            const compare = (a: string | number, b: string | number) => {
+                if (a < b) return -1;
+                if (a > b) return 1;
+                return 0;
+            }
+
+            let result = 0;
+            if (result === 0) result = compare(Number(!!b.children), Number(!!a.children));
+            if (result === 0) result = compare(a.name, b.name);
+            return result;
         });
         return result;
     }
