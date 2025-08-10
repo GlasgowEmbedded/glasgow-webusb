@@ -386,19 +386,8 @@ declare global {
     const updateFileTree = async () => {
         fileTree.value = await glasgowFS.readFileTree(HOME_DIRECTORY);
     };
-    const queueFileTreeUpdate = (() => {
-        let queued = false;
-        return () => {
-            if (queued) return;
-            setTimeout(() => {
-                queued = false;
-                updateFileTree();
-            }, 0);
-            queued = true;
-        };
-    })();
     await glasgowFS.subscribeToHomeUpdates(() => {
-        queueFileTreeUpdate();
+        updateFileTree();
     });
 
     Object.assign(window, { pyodide });

@@ -1,3 +1,4 @@
+import debounce from 'lodash/debounce';
 import type { PyodideAPI } from './pyodide';
 import type { TreeNode } from './components/tree-view';
 import { HOME_DIRECTORY, MOUNT_DIRECTORY } from './filesystem-constants';
@@ -9,37 +10,40 @@ export interface FileTreeNode extends TreeNode {
 export class GlasgowFileSystem {
     #pyodide: PyodideAPI;
     #nativeFSMountRoot: unknown | null = null;
+    #homeUpdateCallback: (() => void) | null = null;
 
     constructor({ pyodide }: { pyodide: PyodideAPI }) {
         this.#pyodide = pyodide;
     }
 
     subscribeToHomeUpdates(callback: () => void) {
+        this.#homeUpdateCallback = debounce(callback, 0);
+
         // @ts-expect-error Pyodide's FS typings are not comprehensive enough
         let trackingDelegate: Record<string, (...args: any) => void> = this.#pyodide.FS.trackingDelegate;
         trackingDelegate['onMakeDirectory'] = (path: string, mode: number) => {
             if (path.startsWith(HOME_DIRECTORY)) {
-                callback();
+                this.#homeUpdateCallback?.();
             }
         };
         trackingDelegate['onMakeSymlink'] = (oldPath: string, newPath: string) => {
             if (newPath.startsWith(HOME_DIRECTORY)) {
-                callback();
+                this.#homeUpdateCallback?.();
             }
         };
         trackingDelegate['onMovePath'] = (oldPath: string, newPath: string) => {
             if (oldPath.startsWith(HOME_DIRECTORY) || newPath.startsWith(HOME_DIRECTORY)) {
-                callback();
+                this.#homeUpdateCallback?.();
             }
         };
         trackingDelegate['onDeletePath'] = (path: string) => {
             if (path.startsWith(HOME_DIRECTORY)) {
-                callback();
+                this.#homeUpdateCallback?.();
             }
         };
         trackingDelegate['onCloseFile'] = (path: string) => {
             if (path.startsWith(HOME_DIRECTORY)) {
-                callback();
+                this.#homeUpdateCallback?.();
             }
         };
     }
