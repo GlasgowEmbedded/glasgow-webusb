@@ -350,7 +350,7 @@ body {
             grid-template-columns: 16px 16px 1fr max-content;
             align-items: center;
             gap: 4px;
-            padding-inline-start: calc(16px + 20px * var(--level, 0));
+            padding-inline-start: calc(8px + 20px * var(--level, 0));
             padding-inline-end: 8px;
             cursor: pointer;
             user-select: none;
