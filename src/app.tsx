@@ -7,7 +7,6 @@ import { loadPyodide, type PyProxy } from './vendor/pyodide';
 import { loadToolchain } from './toolchain';
 import { Terminal } from './terminal';
 import { GlasgowFileSystem, type FileTreeNode } from './filesystem';
-import { HOME_DIRECTORY } from './filesystem-constants';
 
 import { PanelContainer } from './components/panel';
 import { TreeView, type TreeViewAPI } from './components/tree-view';
@@ -15,9 +14,8 @@ import { TreeView, type TreeViewAPI } from './components/tree-view';
 import { joinPath } from './helpers/path';
 import { truthyFilter } from './helpers/truthy-filter';
 
+import { GLASGOW_WHEEL_URL, HOME_DIRECTORY } from './config';
 import shell from './shell.py';
-
-const GLASGOW_WHEEL_URL = "https://glasgow-embedded.org/latest/dist/glasgow-0.1.dev0-py3-none-any.whl";
 
 declare global {
     namespace WebAssembly {

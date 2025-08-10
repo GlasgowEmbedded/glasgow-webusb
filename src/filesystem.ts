@@ -2,7 +2,7 @@ import debounce from 'lodash/debounce';
 import type { PyodideAPI } from './vendor/pyodide';
 
 import type { TreeNode } from './components/tree-view';
-import { HOME_DIRECTORY, MOUNT_DIRECTORY } from './filesystem-constants';
+import { HOME_DIRECTORY, MOUNT_DIRECTORY } from './config';
 
 export interface FileTreeNode extends TreeNode {
     path: string;
