@@ -193,16 +193,17 @@ interface FileTreeNode extends TreeNode {
                         iconName: 'terminal',
                         className: 'terminal-panel',
                         actions: computed(() => [
-                            {
-                                name: 'Stop',
-                                iconName: 'stop-circle',
-                                disabled: !isInterruptExecutionButtonEnabled.value,
-                                handleAction: handleInterruptExecutionClick,
-                            },
                             'showDirectoryPicker' in window && {
                                 name: isNativeFSMounted.value ? 'Unmount /mnt' : 'Mount /mnt',
                                 disabled: isNativeFSMountDisabled.value,
                                 handleAction: handleMountNativeFSClick,
+                            },
+                            {
+                                name: 'Stop',
+                                iconName: 'stop-circle',
+                                iconOnly: true,
+                                disabled: !isInterruptExecutionButtonEnabled.value,
+                                handleAction: handleInterruptExecutionClick,
                             },
                         ].filter(truthyFilter)),
                         children: (
