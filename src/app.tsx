@@ -166,9 +166,6 @@ declare global {
         if (['', '.', '..'].includes(newName)) {
             throw 'The file name must not be . or ..';
         }
-        if (newName.includes('/')) {
-            throw 'The file name must not include a slash';
-        }
 
         const path = joinPath(HOME_DIRECTORY, ...parents, node);
         const newPath = joinPath(HOME_DIRECTORY, ...parents, newName);
