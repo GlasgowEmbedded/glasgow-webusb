@@ -361,7 +361,7 @@ interface FileTreeNode extends TreeNode {
         env: { HOME: HOME_DIRECTORY },
     });
 
-    const interruptBuffer = new Uint8Array(new ArrayBuffer(1));
+    const interruptBuffer = new Uint8Array(new SharedArrayBuffer(1));
     pyodide.setInterruptBuffer(interruptBuffer);
 
     const pyKeyboardInterrupt = pyodide.globals.get("KeyboardInterrupt");
@@ -371,8 +371,8 @@ interface FileTreeNode extends TreeNode {
             // this will interrupt async I/O (but not stdin reads or long running computations).
             interruptFuture.set_exception(pyKeyboardInterrupt());
         } else {
-             // raise SIGINT signal within Python interpreter on next PyErr_CheckSignals() call;
-             // this will interrupt long running computations (but not async I/O or stdin reads)
+            // raise SIGINT signal within Python interpreter on next PyErr_CheckSignals() call;
+            // this will interrupt long running computations (but not async I/O or stdin reads)
             interruptBuffer[0] = 2;
         }
     };

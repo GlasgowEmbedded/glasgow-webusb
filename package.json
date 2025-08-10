@@ -33,6 +33,7 @@
     "@yowasp/nextpnr-ice40": "release",
     "@yowasp/runtime": "^9.0.56",
     "@yowasp/yosys": "release",
+    "coi-serviceworker": "^0.1.7",
     "esbuild": "^0.25.8",
     "eslint": "^9.31.0",
     "lodash": "^4.17.21",
