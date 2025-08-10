@@ -1,19 +1,23 @@
 import { render, options } from 'preact';
 import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
+
 import { loadToolchain } from './toolchain';
 import { loadPyodide, type PyProxy } from './pyodide';
-import { PanelContainer } from './components/panel';
 import { Terminal } from './terminal';
-import { type TreeNode, TreeView, type TreeViewAPI } from './components/tree-view';
+import { GlasgowFileSystem, type FileTreeNode } from './filesystem';
+import { HOME_DIRECTORY } from './filesystem-constants';
+
+import { PanelContainer } from './components/panel';
+import { TreeView, type TreeViewAPI } from './components/tree-view';
+
+import { joinPath } from './helpers/path';
 import { truthyFilter } from './helpers/truthy-filter';
+
 import termColors from './terminal-colors';
 import shell from './shell.py';
 
 const GLASGOW_WHEEL_URL = "https://glasgow-embedded.org/latest/dist/glasgow-0.1.dev0-py3-none-any.whl";
-
-const HOME_DIRECTORY = "/root";
-const MOUNT_DIRECTORY = "/mnt";
 
 declare global {
     function terminalColumns(): number;
@@ -24,10 +28,6 @@ declare global {
     function signalExecutionStart(): void;
     function signalExecutionEnd(): void;
     function setInterruptFuture(future: any): void;
-}
-
-interface FileTreeNode extends TreeNode {
-    path: string;
 }
 
 (() => {
@@ -51,14 +51,12 @@ interface FileTreeNode extends TreeNode {
 
     const isNativeFSMounted = signal(false);
     const isNativeFSMountDisabled = signal(true);
-    let nativeFSMountRoot: unknown | null = null;
 
     const handleMountNativeFSClick = async () => {
         isNativeFSMountDisabled.value = true;
 
         if (isNativeFSMounted.value) {
-            pyodide.FS.unmount(MOUNT_DIRECTORY);
-            pyodide.FS.rmdir(MOUNT_DIRECTORY);
+            await glasgowFS.unmountNativeFS();
 
             isNativeFSMounted.value = false;
             isNativeFSMountDisabled.value = false;
@@ -69,12 +67,7 @@ interface FileTreeNode extends TreeNode {
             if (!confirm("The changes in the directory you pick will be reflected within /mnt and vice versa. Bugs may cause DATA CORRUPTION. Consider picking a new directory just for this application."))
                 throw new Error("declined");
 
-            const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
-            nativeFSMountRoot = pyodide.FS.mount(pyodide.FS.filesystems.NATIVEFS_ASYNC, {
-                fileSystemHandle,
-            }, MOUNT_DIRECTORY);
-            syncFSFromBacking();
+            await glasgowFS.mountNativeFS();
             isNativeFSMounted.value = true;
         } finally {
             isNativeFSMountDisabled.value = false;
@@ -116,12 +109,8 @@ interface FileTreeNode extends TreeNode {
 
     let treeViewAPI: TreeViewAPI<FileTreeNode> | null = null;
 
-    const nodeAndParentsToPath = (node: FileTreeNode | null, parents: FileTreeNode[], ...segments: string[]) =>
-        [parents.map(({ name }) => name), node && node.name, ...segments].filter(Boolean).join('/');
-
-    const handleFileTreeNodeAction = (node: FileTreeNode) => {
-        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-        let fileContents: Uint8Array<ArrayBuffer> = pyodide.FS.readFile(node.path);
+    const handleFileTreeNodeAction = async (node: FileTreeNode) => {
+        let fileContents = await glasgowFS.readFile(node.path);
         let url = URL.createObjectURL(new Blob([fileContents]));
         let element = document.createElement('a');
         element.href = url;
@@ -146,7 +135,7 @@ interface FileTreeNode extends TreeNode {
                     underNode: node,
                     defaultName: file.name,
                     async execute({ node, parents, name, dryRun }) {
-                        handleNewFileCreation(node, parents, name, 'file', fileContents, dryRun);
+                        await glasgowFS.createPath(joinPath(HOME_DIRECTORY, ...parents, node, name), 'file', fileContents, dryRun);
                     },
                 });
             });
@@ -159,79 +148,20 @@ interface FileTreeNode extends TreeNode {
         treeViewAPI!.createFolder({
             underNode: node,
             async execute({ node, parents, name, dryRun }) {
-                handleNewFileCreation(node, parents, name, 'folder', null, dryRun);
+                await glasgowFS.createPath(joinPath(HOME_DIRECTORY, ...parents, node, name), 'folder', null, dryRun);
             },
         });
     };
 
-    const handleNewFileCreation = (
-        node: FileTreeNode | null,
-        parents: FileTreeNode[],
-        name: string,
-        type: 'file' | 'folder',
-        fileContents: Uint8Array<ArrayBuffer> | null,
-        dryRun: boolean,
-    ) => {
-        if (['', '.', '..'].includes(name)) {
-            throw 'The file name must not be . or ..';
-        }
-        if (name.includes('/')) {
-            throw 'The file name must not include a slash';
-        }
-
-        const path = nodeAndParentsToPath(node, parents, name);
-        const absolutePath = pyodide.PATH.join(HOME_DIRECTORY, path);
-
-        let stat;
-        try {
-            stat = pyodide.FS.stat(absolutePath, true);
-        } catch (e) {}
-        if (stat) {
-            throw `A ${pyodide.FS.isDir(stat.mode) ? 'folder' : 'file'} with the same name already exists`;
-        }
-
-        if (dryRun)
-            return;
-
-        switch (type) {
-            case 'file': {
-                pyodide.FS.mkdirTree(pyodide.PATH.dirname(absolutePath));
-                const stream = pyodide.FS.open(absolutePath, 'w+');
-                pyodide.FS.write(stream, fileContents!, 0, fileContents!.length, 0);
-                pyodide.FS.close(stream);
-                break;
-            }
-            case 'folder': {
-                pyodide.FS.mkdirTree(absolutePath);
-                break;
-            }
-        }
-    };
-
-    const handleFileDeletion = (node: FileTreeNode, parents: FileTreeNode[]) => {
+    const handleFileDeletion = async (node: FileTreeNode, parents: FileTreeNode[]) => {
         if (!confirm(`Are you sure you want to delete ${node.children ? 'folder' : 'file'} "${node.name}"? This operation is irreversible.`)) {
             return;
         }
 
-        const path = nodeAndParentsToPath(node, parents);
-
-        const deleteFile = (path: string) => {
-            if (pyodide.FS.isDir(pyodide.FS.stat(path, true).mode)) {
-                for (const file of pyodide.FS.readdir(path)) {
-                    if (file === '.' || file === '..') {
-                        continue;
-                    }
-                    deleteFile(`${path}/${file}`);
-                }
-                pyodide.FS.rmdir(path);
-            } else {
-                pyodide.FS.unlink(path);
-            }
-        };
-        deleteFile(pyodide.PATH.join(HOME_DIRECTORY, path));
+        await glasgowFS.deletePath(joinPath(HOME_DIRECTORY, ...parents, node));
     };
 
-    const handleFileRename = (node: FileTreeNode, parents: FileTreeNode[], newName: string, dryRun: boolean) => {
+    const handleFileRename = async (node: FileTreeNode, parents: FileTreeNode[], newName: string, dryRun: boolean) => {
         if (['', '.', '..'].includes(newName)) {
             throw 'The file name must not be . or ..';
         }
@@ -239,22 +169,10 @@ interface FileTreeNode extends TreeNode {
             throw 'The file name must not include a slash';
         }
 
-        const path = pyodide.PATH.join(HOME_DIRECTORY, nodeAndParentsToPath(node, parents));
-        const newPath = pyodide.PATH.join(HOME_DIRECTORY, nodeAndParentsToPath(null, parents, newName));
+        const path = joinPath(HOME_DIRECTORY, ...parents, node);
+        const newPath = joinPath(HOME_DIRECTORY, ...parents, newName);
 
-        let stat;
-        try {
-            stat = pyodide.FS.stat(newPath, true);
-        } catch (e) {}
-        if (stat && path !== newPath) {
-            throw `A ${pyodide.FS.isDir(stat.mode) ? 'folder' : 'file'} with the same name already exists`;
-        }
-
-        if (dryRun)
-            return;
-
-        // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-        pyodide.FS.rename(path, newPath);
+        await glasgowFS.renamePath(path, newPath, dryRun);
     };
 
     render(
@@ -346,7 +264,7 @@ interface FileTreeNode extends TreeNode {
                                                         execute: (node, parents, nodeAPI) => {
                                                             nodeAPI!.rename({
                                                                 async execute({ newName, dryRun }) {
-                                                                    handleFileRename(node!, parents, newName, dryRun);
+                                                                    await handleFileRename(node!, parents, newName, dryRun);
                                                                 },
                                                             });
                                                         },
@@ -420,6 +338,8 @@ interface FileTreeNode extends TreeNode {
         env: { HOME: HOME_DIRECTORY },
     });
 
+    const glasgowFS = new GlasgowFileSystem({ pyodide });
+
     const interruptBuffer = new Uint8Array(new SharedArrayBuffer(1));
     pyodide.setInterruptBuffer(interruptBuffer);
 
@@ -457,62 +377,16 @@ interface FileTreeNode extends TreeNode {
     // broken:
     // stdinStream.tty = { ops: {} };
 
-    const readFileTree = (path: string) => {
-        let result = [];
-        let names = pyodide.FS.readdir(path);
-        for (let name of names) {
-            if (name === '.' || name === '..') {
-                continue;
-            }
-
-            let node: FileTreeNode = {
-                name,
-                path: `${path}/${name}`,
-            };
-            let stat = pyodide.FS.stat(node.path, true);
-            if (pyodide.FS.isDir(stat.mode)) {
-                node.children = readFileTree(node.path);
-            }
-            result.push(node);
-        }
-        result.sort((a, b) => {
-            return Number(!!b.children) - Number(!!a.children);
-        });
-        return result;
+    globalThis.syncFSFromBacking = () => {
+        return glasgowFS.syncFSFromBacking();
     };
 
-    globalThis.syncFSFromBacking = async () => {
-        if (!nativeFSMountRoot) return;
-        return await new Promise((resolve, reject) => {
-            pyodide.FS.filesystems.NATIVEFS_ASYNC.syncfs((nativeFSMountRoot as any).mount, true, (error: unknown) => {
-                if (error !== null) {
-                    console.log('[FS Error]', error);
-                    reject(error);
-                    return;
-                }
-
-                resolve();
-            });
-        });
+    globalThis.syncFSToBacking = () => {
+        return glasgowFS.syncFSToBacking();
     };
 
-    globalThis.syncFSToBacking = async () => {
-        if (!nativeFSMountRoot) return;
-        return await new Promise((resolve, reject) => {
-            pyodide.FS.filesystems.NATIVEFS_ASYNC.syncfs((nativeFSMountRoot as any).mount, false, (error: unknown) => {
-                if (error !== null) {
-                    console.log('[FS Error]', error);
-                    reject(error);
-                    return;
-                }
-
-                resolve();
-            });
-        });
-    };
-
-    const updateFileTree = () => {
-        fileTree.value = readFileTree(HOME_DIRECTORY);
+    const updateFileTree = async () => {
+        fileTree.value = await glasgowFS.readFileTree(HOME_DIRECTORY);
     };
     const queueFileTreeUpdate = (() => {
         let queued = false;
@@ -525,48 +399,13 @@ interface FileTreeNode extends TreeNode {
             queued = true;
         };
     })();
-
-    // @ts-expect-error Pyodide's FS typings are not comprehensive enough
-    let trackingDelegate: Record<string, (...args: any) => void> = pyodide.FS.trackingDelegate;
-    trackingDelegate['onMakeDirectory'] = (path: string, mode: number) => {
-        if (path.startsWith(HOME_DIRECTORY)) {
-            queueFileTreeUpdate();
-        }
-    };
-    trackingDelegate['onMakeSymlink'] = (oldPath: string, newPath: string) => {
-        if (newPath.startsWith(HOME_DIRECTORY)) {
-            queueFileTreeUpdate();
-        }
-    };
-    trackingDelegate['onMovePath'] = (oldPath: string, newPath: string) => {
-        if (oldPath.startsWith(HOME_DIRECTORY) || newPath.startsWith(HOME_DIRECTORY)) {
-            queueFileTreeUpdate();
-        }
-    };
-    trackingDelegate['onDeletePath'] = (path: string) => {
-        if (path.startsWith(HOME_DIRECTORY)) {
-            queueFileTreeUpdate();
-        }
-    };
-    trackingDelegate['onCloseFile'] = (path: string) => {
-        if (path.startsWith(HOME_DIRECTORY)) {
-            queueFileTreeUpdate();
-        }
-    };
+    await glasgowFS.subscribeToHomeUpdates(() => {
+        queueFileTreeUpdate();
+    });
 
     Object.assign(window, { pyodide });
 
-    pyodide.FS.mkdirTree(HOME_DIRECTORY);
-    const homeMountRoot = pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { autoPersist: true }, HOME_DIRECTORY);
-    pyodide.FS.filesystems.IDBFS.syncfs(homeMountRoot.mount, true, (error: unknown) => {
-        if (error !== null) {
-            console.log('[FS Error]', error);
-            return;
-        }
-
-        updateFileTree();
-    });
-
+    await glasgowFS.mountHome();
     isNativeFSMountDisabled.value = false;
 
     printProgress('Loading Glasgow software...');
