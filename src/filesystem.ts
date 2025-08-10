@@ -168,7 +168,7 @@ export class GlasgowFileSystem {
         this.#nativeFSMountRoot = this.#pyodide.FS.mount(this.#pyodide.FS.filesystems.NATIVEFS_ASYNC, {
             fileSystemHandle,
         }, MOUNT_DIRECTORY);
-        await syncFSFromBacking();
+        await this.syncFSFromBacking();
     }
 
     async unmountNativeFS() {
