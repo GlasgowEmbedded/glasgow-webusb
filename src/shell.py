@@ -16,6 +16,7 @@ while failures < 3:
         command = input("\n> glasgow ")
         sys.argv = ["glasgow", *shlex.split(command)]
         os.environ["COLUMNS"] = str(js.terminalColumns())
+        os.environ["GLASGOW_COLORS"] = "TRACE=37:INFO=1;37"
         await js.syncFSFromBacking()
         js.signalExecutionStart()
         try:
