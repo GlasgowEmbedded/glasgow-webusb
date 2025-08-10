@@ -126,8 +126,8 @@ body {
 
 .panel-container:not(.single-panel) .panel-grid {
     grid-template-rows: 1fr;
-    grid-template-columns: 1fr 300px;
-    grid-template-areas: 'terminal sidebar';
+    grid-template-columns: 300px 1fr;
+    grid-template-areas: 'sidebar terminal';
     gap: 8px;
     padding: 8px;
 }
