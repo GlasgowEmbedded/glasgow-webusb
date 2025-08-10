@@ -162,6 +162,24 @@ declare global {
         await glasgowFS.deletePath(joinPath(HOME_DIRECTORY, ...parents, node));
     };
 
+    const handleFileDuplicate = async (node: FileTreeNode, parents: FileTreeNode[]) => {
+        let options: (
+            | Parameters<NonNullable<typeof treeViewAPI>['createFile']>[0]
+            | Parameters<NonNullable<typeof treeViewAPI>['createFolder']>[0]
+        ) = {
+            underNode: parents.at(-1) ?? null,
+            defaultName: node.name,
+            async execute({ name, dryRun }) {
+                await glasgowFS.duplicatePath(node.path, joinPath(HOME_DIRECTORY, ...parents, name), dryRun);
+            },
+        };
+        if (!node.children) {
+            treeViewAPI!.createFile(options);
+        } else {
+            treeViewAPI!.createFolder(options);
+        }
+    };
+
     const handleFileRename = async (node: FileTreeNode, parents: FileTreeNode[], newName: string, dryRun: boolean) => {
         if (['', '.', '..'].includes(newName)) {
             throw 'The file name must not be . or ..';
@@ -255,6 +273,11 @@ declare global {
                                                         applicable: (node) => !!node && !node.children,
                                                         execute: (node) => handleFileTreeNodeAction(node!),
                                                         showInline: true,
+                                                    },
+                                                    {
+                                                        name: 'Duplicate...',
+                                                        applicable: (node) => !!node,
+                                                        execute: (node, parents) => handleFileDuplicate(node!, parents),
                                                     },
                                                     {
                                                         name: 'Rename...',

@@ -144,14 +144,54 @@ export class GlasgowFileSystem {
         deleteFile(path);
     }
 
-    renamePath(path: string, newPath: string, dryRun: boolean) {
+    #ensureDoesNotExist(path: string) {
         let stat;
         try {
-            stat = this.#pyodide.FS.stat(newPath, true);
+            stat = this.#pyodide.FS.stat(path, true);
         } catch (e) {}
-        if (stat && path !== newPath) {
+        if (stat) {
             throw `A ${this.#pyodide.FS.isDir(stat.mode) ? 'folder' : 'file'} with the same name already exists`;
         }
+    }
+
+    duplicatePath(path: string, newPath: string, dryRun: boolean) {
+        if (path === newPath)
+            throw 'The path cannot be the same';
+
+        this.#ensureDoesNotExist(newPath);
+
+        if (dryRun)
+            return;
+
+        const duplicate = (path: string, newPath: string) => {
+            const stat = this.#pyodide.FS.stat(path, true);
+            if (this.#pyodide.FS.isDir(stat.mode)) {
+                this.#pyodide.FS.mkdirTree(newPath);
+                for (const file of this.#pyodide.FS.readdir(path)) {
+                    if (file === '.' || file === '..') {
+                        continue;
+                    }
+                    duplicate(this.#pyodide.PATH.join(path, file), this.#pyodide.PATH.join(newPath, file));
+                }
+            // @ts-expect-error Pyodide's typings -_-
+            } else if (this.#pyodide.FS.isLink(stat.mode)) {
+                // @ts-expect-error Pyodide's typings -_-
+                const link = this.#pyodide.FS.readlink(path);
+                this.#pyodide.FS.symlink(link, newPath);
+            } else {
+                // @ts-expect-error Pyodide's typings -_-
+                const contents = this.#pyodide.FS.readFile(path);
+                this.#pyodide.FS.writeFile(newPath, contents);
+            }
+        };
+        duplicate(path, newPath);
+    }
+
+    renamePath(path: string, newPath: string, dryRun: boolean) {
+        if (path === newPath)
+            return;
+
+        this.#ensureDoesNotExist(newPath);
 
         if (dryRun)
             return;

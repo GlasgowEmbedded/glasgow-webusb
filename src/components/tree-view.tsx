@@ -26,12 +26,13 @@ interface TreeNodeAction<N extends TreeNode> {
 export interface TreeViewAPI<N extends TreeNode> {
     createFile(options: {
         underNode: TreeNode | null;
-        defaultName: string;
+        defaultName?: string;
         execute(options: { node: N | null; parents: N[]; name: string; dryRun: boolean; }): Promise<void>;
     }): void;
 
     createFolder(options: {
         underNode: TreeNode | null;
+        defaultName?: string;
         execute(options: { node: N | null; parents: N[]; name: string; dryRun: boolean; }): Promise<void>;
     }): void;
 }
@@ -135,11 +136,7 @@ const TreeNodeCreationForm = ({ creatingType, parents }: TreeNodeCreationProps) 
                     className="tree-node-name"
                     type="text"
                     name="name"
-                    defaultValue={
-                        'defaultName' in treeRootContext.creatingNewNode.value!
-                            ? treeRootContext.creatingNewNode.value.defaultName
-                            : ''
-                    }
+                    defaultValue={treeRootContext.creatingNewNode.value!.defaultName ?? ''}
                     autocomplete="off"
                     onBlur={handleBlur}
                     onKeyDown={handleKeyDown}
