@@ -92,18 +92,18 @@ onmessage = async (event) => {
     const { files, scriptName } = event.data;
     const result = await executeScript(files, scriptName, (bytes) => {
         if (bytes.length !== 0) {
-            console.log('[Worker Output]', new TextDecoder().decode(bytes).trimEnd());
+            console.log('[Builder Output]', new TextDecoder().decode(bytes).trimEnd());
             postMessage({ type: 'output', bytes });
         }
     });
-    console.log('[Worker Result]', result);
+    console.log('[Builder Result]', result);
     postMessage({ type: 'result', ...result });
 
 };
 
 onunhandledrejection = (event) => {
     if (event.reason instanceof Error) {
-        console.error('[Worker Error]', event.reason);
+        console.error('[Builder Error]', event.reason);
         postMessage({ type: 'error', error: event.reason });
         event.preventDefault();
     }
