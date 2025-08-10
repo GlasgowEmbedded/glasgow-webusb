@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+
 import { classNames } from '../helpers/class-names';
 
 export const IconMore = (props: JSX.SVGAttributes<SVGSVGElement>) => {

@@ -2,10 +2,11 @@ import type { ComponentChildren, RefCallback } from 'preact';
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { computed, useComputed, useSignal, type ReadonlySignal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
+
+import { classNames } from '../helpers/class-names';
 import { ContextMenu, type TwoDim } from './context-menu';
 import { Icon } from './icon';
 import { IconMore } from './icon-more';
-import { classNames } from '../helpers/class-names';
 
 const resizeObserverCallbacks = new Map<Element, (entry: ResizeObserverEntry) => void>();
 

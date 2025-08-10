@@ -2,13 +2,14 @@ import { createContext, type Ref } from 'preact';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import { computed, type ReadonlySignal, signal, Signal, useSignal, useSignalEffect } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
-import { ContextMenu, type TwoDim } from './context-menu';
-import { Icon } from './icon';
-import { IconMore } from './icon-more';
+
 import { classNames } from '../helpers/class-names';
 import { writeToRef } from '../helpers/write-to-ref';
 import { mergeRefs } from '../helpers/merge-refs';
 import { modulo } from '../helpers/modulo';
+import { ContextMenu, type TwoDim } from './context-menu';
+import { Icon } from './icon';
+import { IconMore } from './icon-more';
 
 export interface TreeNode {
     name: string;

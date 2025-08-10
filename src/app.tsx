@@ -2,9 +2,9 @@ import { render, options } from 'preact';
 import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
 import termColors from './vendor/terminal-colors';
+import { loadPyodide, type PyProxy } from './vendor/pyodide';
 
 import { loadToolchain } from './toolchain';
-import { loadPyodide, type PyProxy } from './vendor/pyodide';
 import { Terminal } from './terminal';
 import { GlasgowFileSystem, type FileTreeNode } from './filesystem';
 import { HOME_DIRECTORY } from './filesystem-constants';

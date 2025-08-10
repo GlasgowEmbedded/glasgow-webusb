@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { computed, signal, useSignalEffect } from '@preact/signals';
 import { computePosition, flip, shift, size } from '@floating-ui/dom';
+
 import { classNames } from '../helpers/class-names';
 import { modulo } from '../helpers/modulo';
 
