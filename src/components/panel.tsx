@@ -160,10 +160,10 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
                     {computed(() => panels.map((panel, idx) => (
                         <button
                             className={classNames('panel-title', () => activePanelIdx.value === idx && 'active')}
+                            aria-label={panel.name}
                             onClick={() => activePanelIdx.value = idx}
                         >
                             <Icon className="aligned-icon" name={panel.iconName} />
-                            {computed(() => activePanelIdx.value === idx ? <span>{panel.name}</span> : null)}
                         </button>
                     )))}
                     {computed(() => <PanelActions actions={panels[activePanelIdx.value].actions} />)}
