@@ -52,7 +52,6 @@ interface FileTreeNode extends TreeNode {
         isNativeFSMountDisabled.value = true;
 
         if (isNativeFSMounted.value) {
-            // @ts-expect-error
             pyodide.FS.unmount(MOUNT_DIRECTORY);
             pyodide.FS.rmdir(MOUNT_DIRECTORY);
 
@@ -320,7 +319,7 @@ interface FileTreeNode extends TreeNode {
     };
 
     printText(termColors.bold('Glasgow Interface Explorer on the Web platform'));
-    printText('Experimental software, use at your own risk.');
+    printText(termColors.yellowBright('Experimental software, use at your own risk.'));
     printText('All data is processed locally.');
     printText('Files in /root are persisted over reloads.');
     printText('');
@@ -486,23 +485,18 @@ interface FileTreeNode extends TreeNode {
 
     isNativeFSMountDisabled.value = false;
 
-    printProgress('Loading dependencies...');
-    await pyodide.loadPackage([
-        './whl/micropip-0.10.0-py3-none-any.whl',
-        './whl/markupsafe-3.0.2-cp313-cp313-pyodide_2025_0_wasm32.whl',
-        './whl/cobs-1.2.1-cp313-cp313-pyodide_2025_0_wasm32.whl',
-    ], {
-        messageCallback: printProgress,
-    });
-
     printProgress('Loading Glasgow software...');
-    await pyodide.runPythonAsync(String.raw`
-        import micropip
-        await micropip.install('./whl/glasgow-0.1-py3-none-any.whl')
 
-        #from _pyrepl.main import interactive_console
-        #interactive_console()
-    `);
+    printText('\x1b[2m', '');
+    await pyodide.loadPackage(['micropip']);
+    const micropip = pyodide.pyimport('micropip');
+    await micropip.install('./whl/glasgow-0.1-py3-none-any.whl');
+    printText('\x1b[22m', '');
+
+    // await pyodide.runPythonAsync(`
+    //     from _pyrepl.main import interactive_console
+    //     interactive_console()
+    // `);
 
     isInitializing.value = false;
     await pyodide.runPythonAsync(shell);
