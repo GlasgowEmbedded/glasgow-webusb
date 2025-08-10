@@ -128,7 +128,48 @@ interface FileTreeNode extends TreeNode {
         URL.revokeObjectURL(url);
     };
 
-    const handleNewFileCreation = (node: FileTreeNode | null, parents: FileTreeNode[], name: string, type: 'file' | 'folder', dryRun: boolean) => {
+    const createNewFile = (node: FileTreeNode | null) => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.addEventListener('change', () => {
+            if (!fileInput.files || fileInput.files.length < 1) {
+                return;
+            }
+            let file = fileInput.files[0];
+            let fileReader = new FileReader();
+            fileReader.addEventListener('loadend', () => {
+                const fileContents = new Uint8Array(fileReader.result as ArrayBuffer);
+
+                treeViewAPI!.createFile({
+                    underNode: node,
+                    defaultName: file.name,
+                    async execute({ node, parents, name, dryRun }) {
+                        handleNewFileCreation(node, parents, name, 'file', fileContents, dryRun);
+                    },
+                });
+            });
+            fileReader.readAsArrayBuffer(file);
+        });
+        fileInput.click();
+    };
+
+    const createNewFolder = (node: FileTreeNode | null) => {
+        treeViewAPI!.createFolder({
+            underNode: node,
+            async execute({ node, parents, name, dryRun }) {
+                handleNewFileCreation(node, parents, name, 'folder', null, dryRun);
+            },
+        });
+    };
+
+    const handleNewFileCreation = (
+        node: FileTreeNode | null,
+        parents: FileTreeNode[],
+        name: string,
+        type: 'file' | 'folder',
+        fileContents: Uint8Array<ArrayBuffer> | null,
+        dryRun: boolean,
+    ) => {
         if (['', '.', '..'].includes(name)) {
             throw 'The file name must not be . or ..';
         }
@@ -150,29 +191,18 @@ interface FileTreeNode extends TreeNode {
         if (dryRun)
             return;
 
-        if (type === 'file') {
-            pyodide.FS.mkdirTree(pyodide.PATH.dirname(absolutePath));
-            const stream = pyodide.FS.open(absolutePath, 'w+');
-            pyodide.FS.close(stream);
-
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.addEventListener('change', () => {
-                if (!fileInput.files || fileInput.files.length < 1) {
-                    return;
-                }
-                let file = fileInput.files[0];
-                let fileReader = new FileReader();
-                fileReader.addEventListener('loadend', () => {
-                    pyodide.FS.writeFile(absolutePath, new Uint8Array(fileReader.result as ArrayBuffer));
-                });
-                fileReader.readAsArrayBuffer(file);
-            });
-            fileInput.click();
-        }
-
-        if (type === 'folder') {
-            pyodide.FS.mkdirTree(absolutePath);
+        switch (type) {
+            case 'file': {
+                pyodide.FS.mkdirTree(pyodide.PATH.dirname(absolutePath));
+                const stream = pyodide.FS.open(absolutePath, 'w+');
+                pyodide.FS.write(stream, fileContents!, 0, fileContents!.length, 0);
+                pyodide.FS.close(stream);
+                break;
+            }
+            case 'folder': {
+                pyodide.FS.mkdirTree(absolutePath);
+                break;
+            }
         }
     };
 
@@ -263,12 +293,7 @@ interface FileTreeNode extends TreeNode {
                                 iconOnly: true,
                                 disabled: fileTree.value === null,
                                 handleAction() {
-                                    treeViewAPI?.createFile({
-                                        underNode: null,
-                                        async execute({ node, parents, name, dryRun }) {
-                                            handleNewFileCreation(node, parents, name, 'file', dryRun);
-                                        },
-                                    });
+                                    createNewFile(null);
                                 },
                             },
                             {
@@ -277,12 +302,7 @@ interface FileTreeNode extends TreeNode {
                                 iconOnly: true,
                                 disabled: fileTree.value === null,
                                 handleAction() {
-                                    treeViewAPI?.createFolder({
-                                        underNode: null,
-                                        async execute({ node, parents, name, dryRun }) {
-                                            handleNewFileCreation(node, parents, name, 'folder', dryRun);
-                                        },
-                                    });
+                                    createNewFolder(null);
                                 },
                             },
                         ]),
@@ -300,12 +320,7 @@ interface FileTreeNode extends TreeNode {
                                                         iconName: 'new-file',
                                                         applicable: (node) => !node || !!node.children,
                                                         execute: (node, _parents) => {
-                                                            treeViewAPI?.createFile({
-                                                                underNode: node,
-                                                                async execute({ node, parents, name, dryRun }) {
-                                                                    handleNewFileCreation(node, parents, name, 'file', dryRun);
-                                                                },
-                                                            });
+                                                            createNewFile(node);
                                                         },
                                                     },
                                                     {
@@ -313,12 +328,7 @@ interface FileTreeNode extends TreeNode {
                                                         iconName: 'new-file',
                                                         applicable: (node) => !node || !!node.children,
                                                         execute: (node, _parents) => {
-                                                            treeViewAPI?.createFolder({
-                                                                underNode: node,
-                                                                async execute({ node, parents, name, dryRun }) {
-                                                                    handleNewFileCreation(node, parents, name, 'folder', dryRun);
-                                                                },
-                                                            });
+                                                            createNewFolder(node);
                                                         },
                                                     },
                                                     {

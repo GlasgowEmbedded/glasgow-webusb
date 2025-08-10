@@ -26,6 +26,7 @@ interface TreeNodeAction<N extends TreeNode> {
 export interface TreeViewAPI<N extends TreeNode> {
     createFile(options: {
         underNode: TreeNode | null;
+        defaultName: string;
         execute(options: { node: N | null; parents: N[]; name: string; dryRun: boolean; }): Promise<void>;
     }): void;
 
@@ -46,7 +47,12 @@ interface TreeRootContextValue {
     nodeElements: Map<TreeNode, HTMLElement>;
     currentlyFocusableNode: Signal<TreeNode | null>;
     creatingNewNode: Signal<
-        null | (Parameters<TreeViewAPI<TreeNode>['createFile']>[0] & { type: 'file' | 'folder'; })
+        (
+            (
+                | Parameters<TreeViewAPI<TreeNode>['createFile']>[0]
+                | Parameters<TreeViewAPI<TreeNode>['createFolder']>[0]
+            ) & { type: 'file' | 'folder'; }
+        ) | null
     >;
     actions: TreeNodeAction<TreeNode>[];
     focus(node: TreeNode | null): void;
@@ -64,8 +70,6 @@ const TreeNodeCreationForm = ({ creatingType, parents }: TreeNodeCreationProps) 
     if (treeRootContext === null) {
         throw new Error('TreeRootContext must be provided');
     }
-
-    const inputRef = useRef<HTMLInputElement>(null);
 
     const execute = useCallback(async (form: HTMLFormElement, dryRun: boolean) => {
         const nameInput = form.elements.namedItem('name') as HTMLInputElement;
@@ -114,10 +118,6 @@ const TreeNodeCreationForm = ({ creatingType, parents }: TreeNodeCreationProps) 
         execute(event.target as HTMLFormElement, false);
     }, []);
 
-    useLayoutEffect(() => {
-        inputRef.current?.focus();
-    }, [inputRef.current]);
-
     return (
         <form className="tree-list-item" onSubmit={handleSubmit}>
             <div className="tree-node-line" style={{ '--level': parents.length }}>
@@ -126,10 +126,20 @@ const TreeNodeCreationForm = ({ creatingType, parents }: TreeNodeCreationProps) 
                 ) : null}
                 <Icon className="tree-node-icon" name={creatingType === 'folder' ? 'folder' : 'file'} aria-hidden />
                 <input
-                    ref={inputRef}
+                    ref={el => {
+                        if (el) {
+                            el.focus();
+                            el.setSelectionRange(0, modulo(el.value.lastIndexOf('.'), el.value.length + 1));
+                        }
+                    }}
                     className="tree-node-name"
                     type="text"
                     name="name"
+                    defaultValue={
+                        'defaultName' in treeRootContext.creatingNewNode.value!
+                            ? treeRootContext.creatingNewNode.value.defaultName
+                            : ''
+                    }
                     autocomplete="off"
                     onBlur={handleBlur}
                     onKeyDown={handleKeyDown}
