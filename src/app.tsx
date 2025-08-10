@@ -10,6 +10,8 @@ import { truthyFilter } from './helpers/truthy-filter';
 import termColors from './terminal-colors';
 import shell from './shell.py';
 
+const GLASGOW_WHEEL_URL = "https://glasgow-embedded.org/latest/dist/glasgow-0.1.dev0-py3-none-any.whl";
+
 const HOME_DIRECTORY = "/root";
 const MOUNT_DIRECTORY = "/mnt";
 
@@ -572,7 +574,7 @@ interface FileTreeNode extends TreeNode {
     printText('\x1b[2m', '');
     await pyodide.loadPackage(['micropip']);
     const micropip = pyodide.pyimport('micropip');
-    await micropip.install('./whl/glasgow-0.1-py3-none-any.whl');
+    await micropip.install(GLASGOW_WHEEL_URL);
     printText('\x1b[22m', '');
 
     // await pyodide.runPythonAsync(`
