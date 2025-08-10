@@ -41,7 +41,7 @@ const options = {
     publicPath: '.',
     entryPoints: {
         'index': 'src/index.html',
-        'pyodide.asm': 'src/pyodide/pyodide.asm.wasm',
+        'pyodide.asm': 'src/vendor/pyodide/pyodide.asm.wasm',
     },
 };
 

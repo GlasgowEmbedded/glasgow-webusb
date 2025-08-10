@@ -1,9 +1,10 @@
 import { render, options } from 'preact';
 import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
+import termColors from './vendor/terminal-colors';
 
 import { loadToolchain } from './toolchain';
-import { loadPyodide, type PyProxy } from './pyodide';
+import { loadPyodide, type PyProxy } from './vendor/pyodide';
 import { Terminal } from './terminal';
 import { GlasgowFileSystem, type FileTreeNode } from './filesystem';
 import { HOME_DIRECTORY } from './filesystem-constants';
@@ -14,7 +15,6 @@ import { TreeView, type TreeViewAPI } from './components/tree-view';
 import { joinPath } from './helpers/path';
 import { truthyFilter } from './helpers/truthy-filter';
 
-import termColors from './terminal-colors';
 import shell from './shell.py';
 
 const GLASGOW_WHEEL_URL = "https://glasgow-embedded.org/latest/dist/glasgow-0.1.dev0-py3-none-any.whl";
