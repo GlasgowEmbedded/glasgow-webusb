@@ -67,7 +67,8 @@ declare global {
             if (!confirm("The changes in the directory you pick will be reflected within /mnt and vice versa. Bugs may cause DATA CORRUPTION. Consider picking a new directory just for this application."))
                 throw new Error("declined");
 
-            await glasgowFS.mountNativeFS();
+            const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            await glasgowFS.mountNativeFS(fileSystemHandle);
             isNativeFSMounted.value = true;
         } finally {
             isNativeFSMountDisabled.value = false;

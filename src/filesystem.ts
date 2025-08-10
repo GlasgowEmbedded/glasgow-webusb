@@ -162,8 +162,7 @@ export class GlasgowFileSystem {
         });
     }
 
-    async mountNativeFS() {
-        const fileSystemHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    async mountNativeFS(fileSystemHandle: FileSystemDirectoryHandle) {
         this.#pyodide.FS.mkdirTree(MOUNT_DIRECTORY);
         this.#nativeFSMountRoot = this.#pyodide.FS.mount(this.#pyodide.FS.filesystems.NATIVEFS_ASYNC, {
             fileSystemHandle,
