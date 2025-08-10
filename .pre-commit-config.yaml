@@ -32,6 +32,9 @@ repos:
     args: [--project, src/tsconfig.json]
 
 ci:
+  skip:
+  - eslint
+  - tsc
   autofix_commit_msg: |
     [pre-commit.ci] Automatic code style fixes.
 
