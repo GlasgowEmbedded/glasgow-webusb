@@ -148,6 +148,25 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
         isSinglePanel.value = entry.borderBoxSize[0].inlineSize <= 600;
     }, []);
 
+    const lastFocusedElementsPerPanel = useMemo<HTMLOrSVGElement[]>(() => [], [panels]);
+
+    const switchToPanel = useCallback((newIdx: number) => {
+        activePanelIdx.value = newIdx;
+    }, [lastFocusedElementsPerPanel]);
+
+    const handlePanelButtonPointerDown = useCallback((newIdx: number) => (event: PointerEvent) => {
+        event.preventDefault();
+        lastFocusedElementsPerPanel[activePanelIdx.value] =
+            (document.activeElement ?? document.body) as HTMLElement as HTMLOrSVGElement;
+        switchToPanel(newIdx);
+        if (lastFocusedElementsPerPanel[newIdx]) {
+            requestAnimationFrame(() => {
+                lastFocusedElementsPerPanel[newIdx].focus();
+                delete lastFocusedElementsPerPanel[newIdx];
+            });
+        }
+    }, [lastFocusedElementsPerPanel]);
+
     const rootRefCallback = useResizeObserverRef(handleResize);
 
     return (
@@ -161,7 +180,8 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
                         <button
                             className={classNames('panel-title', panel.className && `${panel.className}-title`, () => activePanelIdx.value === idx && 'active')}
                             aria-label={panel.name}
-                            onClick={() => activePanelIdx.value = idx}
+                            onClick={() => switchToPanel(idx)}
+                            onPointerDown={handlePanelButtonPointerDown(idx)}
                         >
                             <Icon className="aligned-icon" name={panel.iconName} />
                         </button>
