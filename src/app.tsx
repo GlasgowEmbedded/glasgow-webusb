@@ -318,7 +318,7 @@ interface FileTreeNode extends TreeNode {
         printText(termColors.dim(text), end);
     };
 
-    printText(termColors.bold('Glasgow via WebUSB'));
+    printText(termColors.bold('Glasgow Interface Explorer on the Web platform'));
     printText('Experimental software, use at your own risk.');
     printText('All data is processed locally.');
     printText('Files in /root are persisted over reloads.');
