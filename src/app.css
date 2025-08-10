@@ -284,6 +284,11 @@ body {
     grid-area: terminal;
 }
 
+.terminal-panel,
+.terminal-panel-title {
+    --color-area-background: black;
+}
+
 #terminal {
     height: 0;
     font-family: monospace;

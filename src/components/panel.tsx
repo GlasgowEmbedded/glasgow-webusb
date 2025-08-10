@@ -159,7 +159,7 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
                 {() => <header className="panel-header">
                     {computed(() => panels.map((panel, idx) => (
                         <button
-                            className={classNames('panel-title', () => activePanelIdx.value === idx && 'active')}
+                            className={classNames('panel-title', panel.className && `${panel.className}-title`, () => activePanelIdx.value === idx && 'active')}
                             aria-label={panel.name}
                             onClick={() => activePanelIdx.value = idx}
                         >
