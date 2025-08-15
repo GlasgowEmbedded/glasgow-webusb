@@ -2,8 +2,8 @@ import { createContext, type Ref } from 'preact';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import { computed, type ReadonlySignal, signal, Signal, useSignal, useSignalEffect } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
+import classNames from 'classnames';
 
-import { classNames } from '../helpers/class-names';
 import { writeToRef } from '../helpers/write-to-ref';
 import { mergeRefs } from '../helpers/merge-refs';
 import { modulo } from '../helpers/modulo';
@@ -423,7 +423,7 @@ const TreeNodeView = ({ node, parents, ...other }: TreeNodeViewProps) => {
                 element ? treeRootContext.nodeElements.set(node, element) : treeRootContext.nodeElements.delete(node);
             })}
             role="treeitem"
-            className={classNames('tree-list-item', () => wasLastFocused.value && 'last-focused')}
+            className={computed(() => classNames('tree-list-item', wasLastFocused.value && 'last-focused'))}
             aria-expanded={node.children ? isOpened : undefined}
             tabIndex={computed(() => node === treeRootContext.currentlyFocusableNode.value ? 0 : -1)}
             onFocus={handleFocus}

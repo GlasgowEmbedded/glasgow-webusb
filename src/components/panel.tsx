@@ -2,8 +2,8 @@ import type { ComponentChildren, RefCallback } from 'preact';
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { computed, useComputed, useSignal, type ReadonlySignal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
+import classNames from 'classnames';
 
-import { classNames } from '../helpers/class-names';
 import { ContextMenu, type TwoDim } from './context-menu';
 import { Icon } from './icon';
 import { IconMore } from './icon-more';
@@ -173,13 +173,13 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
     return (
         <div
             ref={rootRefCallback}
-            className={classNames('panel-container', () => isSinglePanel.value && 'single-panel')}
+            className={computed(() => classNames('panel-container', isSinglePanel.value && 'single-panel'))}
         >
             <Show when={isSinglePanel}>
                 {() => <header className="panel-header">
                     {computed(() => panels.map((panel, idx) => (
                         <button
-                            className={classNames('panel-title', panel.className && `${panel.className}-title`, () => activePanelIdx.value === idx && 'active')}
+                            className={computed(() => classNames('panel-title', panel.className && `${panel.className}-title`, activePanelIdx.value === idx && 'active'))}
                             aria-label={panel.name}
                             onClick={() => switchToPanel(idx)}
                             onPointerDown={handlePanelButtonPointerDown(idx)}
@@ -193,12 +193,12 @@ export const PanelContainer = ({ panels }: PanelContainerProps) => {
             <div className="panel-grid">
                 {panels.map((panel, idx) => (
                     <div
-                        className={classNames(
+                        className={computed(() => classNames(
                             'panel',
                             panel.className,
-                            () => !isSinglePanel.value && 'padded',
-                            () => isSinglePanel.value && activePanelIdx.value !== idx && 'panel-hidden',
-                        )}
+                            !isSinglePanel.value && 'padded',
+                            isSinglePanel.value && activePanelIdx.value !== idx && 'panel-hidden',
+                        ))}
                     >
                         <Show when={isMultiplePanel}>
                             <header className="panel-header">

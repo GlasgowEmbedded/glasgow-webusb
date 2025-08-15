@@ -2,8 +2,8 @@ import type { ComponentChildren } from 'preact';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { computed, signal, useSignalEffect } from '@preact/signals';
 import { computePosition, flip, shift, size } from '@floating-ui/dom';
+import classNames from 'classnames';
 
-import { classNames } from '../helpers/class-names';
 import { modulo } from '../helpers/modulo';
 
 export type TwoDim = [number, number];
@@ -175,7 +175,7 @@ export const ContextMenu = ({ position, items, onCancel }: ContextMenuProps) => 
                                 else delete itemElements.current[idx];
                             }}
                             key={idx}
-                            className={classNames('menu-list-item', () => currentIndex.value === idx && 'focused')}
+                            className={computed(() => classNames('menu-list-item', currentIndex.value === idx && 'focused'))}
                             tabIndex={computed(() => currentIndex.value === idx ? 0 : -1)}
                             onClick={handleItemClick(item)}
                             onKeyDown={handleItemKeyDown(item)}
