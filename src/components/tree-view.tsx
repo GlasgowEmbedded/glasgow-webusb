@@ -1,6 +1,6 @@
 import { createContext, type Ref } from 'preact';
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
-import { computed, type ReadonlySignal, signal, Signal, useSignal, useSignalEffect } from '@preact/signals';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'preact/hooks';
+import { computed, signal, Signal, useSignal, useSignalEffect } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import classNames from 'classnames';
 
