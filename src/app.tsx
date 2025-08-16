@@ -23,6 +23,10 @@ declare global {
         const promising: unknown;
     }
 
+    interface RegExpConstructor {
+        escape(string: string): string;
+    }
+
     function terminalColumns(): number;
 
     function syncFSFromBacking(): Promise<void>;
@@ -394,7 +398,7 @@ declare global {
     const updateFileTree = async () => {
         fileTree.value = await glasgowFS.readFileTree(HOME_DIRECTORY);
     };
-    await glasgowFS.subscribeToHomeUpdates(() => {
+    await glasgowFS.subscribeToUpdates(new RegExp(`^${RegExp.escape(HOME_DIRECTORY)}(?:\\/|$)`), () => {
         updateFileTree();
     });
 

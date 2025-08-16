@@ -11,40 +11,49 @@ export interface FileTreeNode extends TreeNode {
 export class GlasgowFileSystem {
     #pyodide: PyodideAPI;
     #nativeFSMountRoot: unknown | null = null;
-    #homeUpdateCallback: (() => void) | null = null;
+    #updateCallbacks = new Map<RegExp, Set<() => void>>();
 
     constructor({ pyodide }: { pyodide: PyodideAPI }) {
         this.#pyodide = pyodide;
-    }
 
-    subscribeToHomeUpdates(callback: () => void) {
-        this.#homeUpdateCallback = debounce(callback, 0);
-
-        let trackingDelegate = this.#pyodide.FS.trackingDelegate;
-        trackingDelegate.onMakeDirectory = (path: string, mode: number) => {
-            if (path.startsWith(HOME_DIRECTORY)) {
-                this.#homeUpdateCallback?.();
+        const runUpdateCallbacks = (path: string) => {
+            for (const [regexp, callbacks] of this.#updateCallbacks) {
+                if (regexp.test(path)) {
+                    callbacks.forEach(callback => callback());
+                }
             }
         };
-        trackingDelegate.onMakeSymlink = (oldPath: string, newPath: string) => {
-            if (newPath.startsWith(HOME_DIRECTORY)) {
-                this.#homeUpdateCallback?.();
-            }
+        const trackingDelegate = this.#pyodide.FS.trackingDelegate;
+        trackingDelegate.onMakeDirectory = (path: string, mode: number) => {
+            runUpdateCallbacks(path);
+        };
+        trackingDelegate.onMakeSymlink = (_sourcePath: string, destPath: string) => {
+            runUpdateCallbacks(destPath);
         };
         trackingDelegate.onMovePath = (oldPath: string, newPath: string) => {
-            if (oldPath.startsWith(HOME_DIRECTORY) || newPath.startsWith(HOME_DIRECTORY)) {
-                this.#homeUpdateCallback?.();
-            }
+            runUpdateCallbacks(oldPath);
+            runUpdateCallbacks(newPath);
         };
         trackingDelegate.onDeletePath = (path: string) => {
-            if (path.startsWith(HOME_DIRECTORY)) {
-                this.#homeUpdateCallback?.();
-            }
+            runUpdateCallbacks(path);
         };
         trackingDelegate.onCloseFile = (path: string) => {
-            if (path.startsWith(HOME_DIRECTORY)) {
-                this.#homeUpdateCallback?.();
-            }
+            runUpdateCallbacks(path);
+        };
+    }
+
+    subscribeToUpdates(regexp: RegExp, callback: () => void) {
+        const debouncedCallback = debounce(() => callback(), 0);
+
+        let registeredCallbacks = this.#updateCallbacks.get(regexp);
+        if (!registeredCallbacks)
+            this.#updateCallbacks.set(regexp, registeredCallbacks = new Set());
+        registeredCallbacks.add(debouncedCallback);
+
+        return () => {
+            registeredCallbacks.delete(debouncedCallback);
+            if (registeredCallbacks.size === 0)
+                this.#updateCallbacks.delete(regexp);
         };
     }
 
