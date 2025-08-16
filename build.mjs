@@ -33,7 +33,7 @@ const options = {
         'ws', // pyodide
     ],
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.css', '.json'],
-    target: 'es2021',
+    target: 'chrome137',
     format: 'esm',
     sourcemap: (mode === 'minify'),
     minify: (mode === 'minify'),

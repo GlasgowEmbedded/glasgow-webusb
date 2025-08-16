@@ -6,9 +6,9 @@
         "jsxImportSource": "preact",
         "moduleResolution": "bundler",
         "module": "esnext",
-        "target": "es2022",
+        "target": "esnext",
         "lib": [
-            "ES2024",
+            "ESNext",
             "DOM",
             "DOM.Iterable",
         ],
