@@ -15,7 +15,7 @@ while failures < 3:
         js.setInterruptFuture(to_js(interrupt_fut))
         command = input("\n> glasgow ")
         sys.argv = ["glasgow", *shlex.split(command)]
-        os.environ["COLUMNS"] = str(js.terminalColumns())
+        os.environ["COLUMNS"] = str(await js.terminalColumns())
         os.environ["GLASGOW_COLORS"] = "TRACE=37:INFO=1;37"
         await js.syncFSFromBacking()
         js.signalExecutionStart()

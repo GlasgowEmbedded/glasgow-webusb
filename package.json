@@ -17,7 +17,7 @@
     "minify": "node build.mts minify",
     "watch": "node build.mts watch",
     "serve": "node build.mts serve",
-    "check": "tsc --project src/tsconfig.json && tsc --project src/builder/tsconfig.json && eslint --fix"
+    "check": "tsc --project src/tsconfig.json && tsc --project src/builder/tsconfig.json && tsc --project src/controller/tsconfig.json && eslint --fix"
   },
   "dependencies": {
     "@chialab/esbuild-plugin-html": "^0.18.2",
@@ -37,6 +37,7 @@
     "@yowasp/yosys": "release",
     "classnames": "^2.5.1",
     "coi-serviceworker": "^0.1.7",
+    "comlink": "^4.4.2",
     "esbuild": "^0.25.8",
     "eslint": "^9.31.0",
     "lodash": "^4.17.21",

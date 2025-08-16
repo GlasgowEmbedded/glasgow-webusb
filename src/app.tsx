@@ -3,11 +3,11 @@ import { render } from 'preact';
 import { computed, effect, signal } from '@preact/signals';
 import debounce from 'lodash/debounce';
 import termColors from './vendor/terminal-colors';
-import { loadPyodide, type PyProxy } from './vendor/pyodide';
 
-import { loadToolchain } from './toolchain';
+import { loadToolchain, createController } from './controller';
+import { InputOutputMethods } from './controller/proto';
 import { Terminal } from './terminal';
-import { GlasgowFileSystem, type FileTreeNode } from './filesystem';
+import { type FileTreeNode } from './filesystem';
 
 import { PanelContainer } from './components/panel';
 import { TreeView, type TreeViewAPI } from './components/tree-view';
@@ -26,15 +26,6 @@ declare global {
     interface RegExpConstructor {
         escape(string: string): string;
     }
-
-    function terminalColumns(): number;
-
-    function syncFSFromBacking(): Promise<void>;
-    function syncFSToBacking(): Promise<void>;
-
-    function signalExecutionStart(): void;
-    function signalExecutionEnd(): void;
-    function setInterruptFuture(future: any): void;
 }
 
 (async () => {
@@ -82,22 +73,9 @@ declare global {
         }
     });
 
-    globalThis.signalExecutionStart = () => {
-        isCurrentlyExecutingCommand.value = true;
-    };
-
-    globalThis.signalExecutionEnd = () => {
-        isCurrentlyExecutingCommand.value = false;
-    };
-
-    let interruptFuture: PyProxy | undefined;
-    globalThis.setInterruptFuture = (future) => {
-        interruptFuture = future;
-    };
-
     const handleInterruptExecutionClick = () => {
         printText(termColors.reset('^C'), '');
-        interrupt();
+        controller.interrupt();
     };
 
     let treeViewAPI: TreeViewAPI<FileTreeNode> | null = null;
@@ -305,10 +283,6 @@ declare global {
     const xterm = new Terminal(document.getElementById('terminal')!);
     xterm.focus();
 
-    globalThis.terminalColumns = () => {
-        return xterm.columns;
-    };
-
     const printText = (text: string, end: string = '\n') => {
         xterm.write(new TextEncoder().encode(text + end));
     };
@@ -346,54 +320,38 @@ declare global {
     await loadToolchain();
 
     printProgress('Loading Python...');
-    const pyodide = await loadPyodide({
+    const controller = await createController({
         env: { HOME: HOME_DIRECTORY },
     });
 
-    const glasgowFS = new GlasgowFileSystem({ pyodide });
+    await controller.handleUSBRequestDevice(async (...args) => {
+        await navigator.usb.requestDevice(...args);
+    });
 
-    const interruptBuffer = new Uint8Array(new SharedArrayBuffer(1));
-    pyodide.setInterruptBuffer(interruptBuffer);
+    const glasgowFS = await controller.getFileSystem();
 
-    const pyKeyboardInterrupt = pyodide.globals.get("KeyboardInterrupt");
-    const interrupt = () => {
-        if (interruptFuture !== undefined && !interruptFuture.done()) {
-            // raise `KeyboardInterrupt` exception within Python webloop on next iteration;
-            // this will interrupt async I/O (but not stdin reads or long running computations).
-            interruptFuture.set_exception(pyKeyboardInterrupt());
-        } else {
-            // raise SIGINT signal within Python interpreter on next PyErr_CheckSignals() call;
-            // this will interrupt long running computations (but not async I/O or stdin reads)
-            interruptBuffer[0] = 2;
-        }
-    };
-    xterm.onInterrupt(interrupt);
+    xterm.onInterrupt(() => controller.interrupt());
 
-    const conoutHandler = {
-        write(buf: Uint8Array) {
+    await controller.setupInputOutput(new InputOutputMethods({
+        read: () => {
+            return xterm.read();
+        },
+        write: (buf: Uint8Array) => {
             xterm.write(buf);
             return buf.length;
         },
-        isatty: true
-    };
-    pyodide.setStdout(conoutHandler);
-    pyodide.setStderr(conoutHandler);
+        terminalColumns: () => {
+            return xterm.columns;
+        },
+    }));
 
-    pyodide.FS.closeStream(0);
-    pyodide.FS.unlink("/dev/stdin");
-    pyodide.FS.createAsyncInputDevice("/dev", "stdin", () => xterm.read());
-    const stdinStream = pyodide.FS.open("/dev/stdin", "r");
-    if (stdinStream.fd !== 0) throw "stdin fd not zero";
-    // broken:
-    // stdinStream.tty = { ops: {} };
+    await controller.onExecutionStart(() => {
+        isCurrentlyExecutingCommand.value = true;
+    });
 
-    globalThis.syncFSFromBacking = () => {
-        return glasgowFS.syncFSFromBacking();
-    };
-
-    globalThis.syncFSToBacking = () => {
-        return glasgowFS.syncFSToBacking();
-    };
+    await controller.onExecutionEnd(() => {
+        isCurrentlyExecutingCommand.value = false;
+    });
 
     const updateFileTree = async () => {
         fileTree.value = await glasgowFS.readFileTree(HOME_DIRECTORY);
@@ -402,17 +360,13 @@ declare global {
         updateFileTree();
     });
 
-    Object.assign(window, { pyodide });
-
     await glasgowFS.mountHome();
     isNativeFSMountDisabled.value = false;
 
     printProgress('Loading Glasgow software...');
 
     printText('\x1b[2m', '');
-    await pyodide.loadPackage(['micropip']);
-    const micropip = pyodide.pyimport('micropip');
-    await micropip.install(GLASGOW_WHEEL_URL);
+    await controller.install(GLASGOW_WHEEL_URL);
     printText('\x1b[22m', '');
 
     // await pyodide.runPythonAsync(`
@@ -421,5 +375,5 @@ declare global {
     // `);
 
     isInitializing.value = false;
-    await pyodide.runPythonAsync(shell);
+    await controller.runPythonAsync(shell);
 })();

@@ -19,5 +19,6 @@
     },
     "exclude": [
         "./builder/**/*",
+        "./controller/**/*",
     ],
 }
