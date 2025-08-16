@@ -50,7 +50,7 @@ const options = {
         'index': 'src/index.html',
         'pyodide.asm': 'src/vendor/pyodide/pyodide.asm.wasm',
     },
-};
+} satisfies esbuild.BuildOptions;
 
 if (mode === 'build' || mode === 'minify') {
     await esbuild.build(options);

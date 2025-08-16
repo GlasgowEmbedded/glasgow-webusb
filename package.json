@@ -13,10 +13,10 @@
     "url": "https://github.com/GlasgowEmbedded/glasgow/issues"
   },
   "scripts": {
-    "build": "node build.mjs build",
-    "minify": "node build.mjs minify",
-    "watch": "node build.mjs watch",
-    "serve": "node build.mjs serve",
+    "build": "node build.mts build",
+    "minify": "node build.mts minify",
+    "watch": "node build.mts watch",
+    "serve": "node build.mts serve",
     "check": "tsc --project src/tsconfig.json && tsc --project src/builder/tsconfig.json && eslint --fix"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "@floating-ui/dom": "^1.7.3",
     "@preact/signals": "^2.2.1",
     "@types/lodash": "^4.17.20",
+    "@types/node": "^24.3.0",
     "@types/w3c-web-usb": "^1.0.10",
     "@types/wicg-file-system-access": "^2023.10.6",
     "@vscode/codicons": "^0.0.38",

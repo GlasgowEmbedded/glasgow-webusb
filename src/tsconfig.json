@@ -12,6 +12,7 @@
             "DOM",
             "DOM.Iterable",
         ],
+        "types": ["w3c-web-usb", "wicg-file-system-access"],
         "strict": true,
         "verbatimModuleSyntax": true,
         "noImplicitAny": true,
