@@ -7,9 +7,16 @@ import htmlPlugin from '@chialab/esbuild-plugin-html';
 const gitCommit = child_process.execSync('git rev-parse HEAD', { encoding: 'utf-8' }).replace(/\n$/, '');
 
 const mode = (process.argv[2] ?? 'build');
+const target = 'chrome137';
 const options = {
     logLevel: 'info',
-    plugins: [metaUrlPlugin(), htmlPlugin()],
+    plugins: [
+        metaUrlPlugin(),
+        htmlPlugin({
+            scriptsTarget: target,
+            modulesTarget: target,
+        }),
+    ],
     bundle: true,
     splitting: false,
     loader: {
@@ -33,7 +40,7 @@ const options = {
         'ws', // pyodide
     ],
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.css', '.json'],
-    target: 'chrome137',
+    target: target,
     format: 'esm',
     sourcemap: (mode === 'minify'),
     minify: (mode === 'minify'),
