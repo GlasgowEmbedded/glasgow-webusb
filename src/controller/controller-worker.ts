@@ -103,10 +103,33 @@ class GlasgowController implements GlasgowControllerInterface {
         terminalColumns: () => number;
     }) {
         const { read, write, terminalColumns } = methods as unknown as Comlink.Remote<typeof methods>;
+        const bufferedWrite = (() => {
+            const pending: Uint8Array[] = [];
+
+            const perform = () => {
+                scheduled = false;
+                const buffer = new Uint8Array(pending.reduce((acc, cur) => acc + cur.length, 0));
+                pending.reduce((acc, cur) => {
+                    buffer.set(cur, acc);
+                    return acc + cur.length;
+                }, 0);
+                pending.length = 0;
+                write(buffer);
+            };
+
+            let scheduled = false;
+            return (buf: Uint8Array) => {
+                pending.push(new Uint8Array(buf));
+                if (!scheduled) {
+                    requestAnimationFrame(perform);
+                    scheduled = true;
+                }
+            };
+        })();
 
         const conoutHandler = {
             write(buf: Uint8Array) {
-                write(buf);
+                bufferedWrite(buf);
                 return buf.length;
             },
             isatty: true
