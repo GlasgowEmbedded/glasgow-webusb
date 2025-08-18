@@ -13,10 +13,10 @@
     "url": "https://github.com/GlasgowEmbedded/glasgow/issues"
   },
   "scripts": {
-    "build": "node build.mts build",
-    "minify": "node build.mts minify",
-    "watch": "node build.mts watch",
-    "serve": "node build.mts serve",
+    "build": "node --experimental-strip-types build.mts build",
+    "minify": "node --experimental-strip-types build.mts minify",
+    "watch": "node --experimental-strip-types build.mts watch",
+    "serve": "node --experimental-strip-types build.mts serve",
     "check": "tsc --project src/tsconfig.json && tsc --project src/builder/tsconfig.json && eslint --fix"
   },
   "dependencies": {
