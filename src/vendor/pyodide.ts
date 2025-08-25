@@ -61,11 +61,14 @@ declare namespace FS {
     }
 
     interface StreamOps {
-        open(stream: FSStream): void;
-        close(stream: FSStream): void;
-        read(stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number): number;
-        write(stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number): number;
-        llseek(stream: FSStream, offset: number, whence: number): number;
+        open?: (stream: FSStream) => void;
+        close?: (stream: FSStream) => void;
+        read?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => number;
+        readAsync?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => Promise<number>;
+        write?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => number;
+        llseek?: (stream: FSStream, offset: number, whence: number) => number;
+        pollAsync?: (stream: FSStream, timeout: number) => Promise<number>;
+        ioctl?: (stream: FSStream, request: number, varargs: number) => number;
     }
 
     class FSNode {
@@ -280,8 +283,56 @@ interface FSExtensions {
     createAsyncInputDevice(parent: FS.FSNode | string, name: string, input: () => Promise<Uint8Array>): FS.FSNode;
 }
 
+declare namespace TTY {
+    interface TTY {
+        input: [];
+        output: [];
+        ops: TTYOps;
+    }
+
+    interface TTYOps {
+        get_char(tty: TTY): number;
+        put_char(tty: TTY, val: number): void;
+        fsync(tty: TTY): void;
+        ioctl_tcgets(tty: TTY): {
+            c_iflag: number;
+            c_oflag: number;
+            c_cflag: number;
+            c_lflag: number;
+            c_cc: number[];
+        };
+        ioctl_tcsets(tty: TTY, optional_actions: unknown, data: {
+            c_iflag: number;
+            c_oflag: number;
+            c_cflag: number;
+            c_lflag: number;
+            c_cc: number[];
+        }): void;
+        ioctl_tiocgwinsz(tty: TTY): [number, number];
+    }
+
+    var stream_ops: FS.StreamOps;
+    var default_tty_ops: TTYOps;
+}
+
 interface PyodideAPI extends OriginalPyodideAPI {
-    FS: typeof FS & FSExtensions & OriginalPyodideAPI['FS'];
+    FS: PyodideAPI['_module']['FS'];
+
+    _module: {
+        HEAP8: Int8Array;
+        HEAP16: Int16Array;
+        HEAP32: Int32Array;
+        HEAPU8: Uint8Array;
+        HEAPU16: Uint16Array;
+        HEAPU32: Uint32Array;
+        HEAPF32: Float32Array;
+        HEAPF64: Float64Array;
+        HEAP64: BigInt64Array;
+        HEAPU64: BigUint64Array;
+
+        FS: typeof FS & FSExtensions & OriginalPyodideAPI['FS'];
+        TTY: typeof TTY;
+    }
 }
 
 export type { PyodideAPI };

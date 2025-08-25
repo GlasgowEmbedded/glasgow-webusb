@@ -347,8 +347,68 @@ declare global {
 
     printProgress('Loading Python...');
     const pyodide = await loadPyodide({
-        env: { HOME: HOME_DIRECTORY },
+        env: {
+            HOME: HOME_DIRECTORY,
+            TERM: 'xterm-256color',
+        },
     });
+
+    // Use Object.assign() so that we can re-use the existing object
+    // and update every currently open stream/TTY at once
+
+    Object.assign(pyodide._module.TTY.default_tty_ops, {
+        ioctl_tcgets: () => {
+            return xterm.getPTYAttrs();
+        },
+
+        ioctl_tcsets: (_tty, _optional_actions, data) => {
+            xterm.setPTYAttrs(data);
+            return 0;
+        },
+
+        ioctl_tiocgwinsz: () => {
+            return [xterm.rows, xterm.columns];
+        },
+
+        get_char: () => { throw new Error('Unimplemented'); },
+        put_char: () => { throw new Error('Unimplemented'); },
+        fsync: () => {},
+    } satisfies typeof pyodide._module.TTY.default_tty_ops);
+
+    Object.assign(pyodide._module.TTY.stream_ops, {
+        async readAsync(_stream, buffer, offset, length, _pos) {
+            let readBytes = await xterm.read(length);
+            buffer.set(readBytes, offset);
+            return readBytes.length;
+        },
+
+        write: (_stream, buffer, offset, length) => {
+            // Note: default `buffer` is for some reason `HEAP8` (signed), while we want unsigned `HEAPU8`.
+            buffer = new Uint8Array(
+                buffer.buffer,
+                buffer.byteOffset,
+                buffer.byteLength,
+            );
+            xterm.write(buffer.subarray(offset, offset + length));
+            return length;
+        },
+
+        async pollAsync(_stream, timeout) {
+            if (!xterm.readable && timeout) {
+                await xterm.waitUntilReadable(timeout);
+            }
+            return (xterm.readable ? 1 /* POLLIN */ : 0) | (xterm.writable ? 4 /* POLLOUT */ : 0);
+        },
+
+        ioctl(_stream, request, varargs) {
+            if (request === 0x541b /* FIONREAD */) {
+                const res = xterm.readableByteCount;
+                pyodide._module.HEAPU32[varargs / 4] = res;
+                return 0;
+            }
+            throw new Error('Unimplemented ioctl request');
+        },
+    } satisfies typeof pyodide._module.TTY.stream_ops);
 
     const glasgowFS = new GlasgowFileSystem({ pyodide });
 
@@ -380,12 +440,23 @@ declare global {
     pyodide.setStderr(conoutHandler);
 
     pyodide.FS.closeStream(0);
-    pyodide.FS.unlink("/dev/stdin");
-    pyodide.FS.createAsyncInputDevice("/dev", "stdin", () => xterm.read());
-    const stdinStream = pyodide.FS.open("/dev/stdin", "r");
-    if (stdinStream.fd !== 0) throw "stdin fd not zero";
-    // broken:
-    // stdinStream.tty = { ops: {} };
+    pyodide.FS.closeStream(1);
+    pyodide.FS.closeStream(2);
+
+    pyodide.FS.unlink('/dev/stdin');
+    pyodide.FS.unlink('/dev/stdout');
+    pyodide.FS.unlink('/dev/stderr');
+
+    pyodide.FS.symlink('/dev/tty', '/dev/stdin');
+    pyodide.FS.symlink('/dev/tty', '/dev/stdout');
+    pyodide.FS.symlink('/dev/tty', '/dev/stderr');
+
+    const stdinStream = pyodide.FS.open('/dev/stdin', 'r');
+    if (stdinStream.fd !== 0) throw 'stdin fd not 0';
+    const stdoutStream = pyodide.FS.open('/dev/stdout', 'w');
+    if (stdoutStream.fd !== 1) throw 'stdout fd not 1';
+    const stderrStream = pyodide.FS.open('/dev/stderr', 'w');
+    if (stderrStream.fd !== 2) throw 'stderr fd not 2';
 
     globalThis.syncFSFromBacking = () => {
         return glasgowFS.syncFSFromBacking();
@@ -414,8 +485,12 @@ declare global {
     const micropip = pyodide.pyimport('micropip');
     await micropip.install(GLASGOW_WHEEL_URL);
     printText('\x1b[22m', '');
+    printText('');
 
     // await pyodide.runPythonAsync(`
+    //     #import site
+    //     #site.enablerlcompleter()
+    //     #site.register_readline()
     //     from _pyrepl.main import interactive_console
     //     interactive_console()
     // `);

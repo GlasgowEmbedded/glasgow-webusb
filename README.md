@@ -15,8 +15,3 @@ Navigate to http://127.0.0.1:8020/. (WebUSB only works on secure origins, so mak
 
 - Windows is still broken due to USB _Set Configuration_ issues
 - Pyodide in this repo is patched manually (see [src/vendor/pyodide/patches/](src/vendor/pyodide/patches/))
-- REPL doesn't have line editing (we should use Pyrepl instead of `prompt()` and cooked terminal, but see below)
-    - Pyrepl is broken:
-        - https://github.com/python/cpython/pull/136758
-    - Setting stdin to be a tty is broken for some reason
-        - No termios integration between Pyodide and Xterm
