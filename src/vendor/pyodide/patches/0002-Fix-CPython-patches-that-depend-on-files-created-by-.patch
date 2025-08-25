@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: miyuko <miyuko@calayucu.com>
+Date: Sat, 30 Aug 2025 15:39:24 +0100
+Subject: [PATCH] Fix CPython patches that depend on files created by earlier
+ patches
+
+GNU patch(1) doesn't move newly created files into place until it's done
+with its input.
+---
+ cpython/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/cpython/Makefile b/cpython/Makefile
+index b4bbd25f..bc4e7830 100644
+--- a/cpython/Makefile
++++ b/cpython/Makefile
+@@ -95,7 +95,9 @@ prepare-source: $(PYBUILD)/.patched
+ 
+ $(PYBUILD)/.patched: $(PYTARBALL)
+ 	[ -d $(PYBUILD) ] || (mkdir -p $(dir $(PYBUILD)); tar -C $(dir $(PYBUILD)) -xf $(PYTARBALL))
+-	cat patches/*.patch | (cd $(PYBUILD) ; patch -p1)
++	find patches -name '*.patch' | sort | while read -r filename; do \
++		cat "$$filename" | (cd $(PYBUILD); patch -p1) \
++	done
+ 	touch $@
+ 
+ $(PYINSTALL)/lib/libffi.a :

@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: miyuko <miyuko@calayucu.com>
+Date: Sat, 30 Aug 2025 15:42:05 +0100
+Subject: [PATCH] Async-ify JS code that calls into Python doing I/O
+
+I don't actually know why the Python code does any I/O during bootstrap.
+---
+ src/js/api.ts     | 11 ++++++-----
+ src/js/pyodide.ts |  2 +-
+ src/js/types.ts   |  4 ++--
+ 3 files changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/src/js/api.ts b/src/js/api.ts
+index 4588e965..191b889a 100644
+--- a/src/js/api.ts
++++ b/src/js/api.ts
+@@ -27,10 +27,11 @@ API.loadBinaryFile = loadBinaryFile;
+ /**
+  * Runs code after python vm has been initialized but prior to any bootstrapping.
+  */
+-API.rawRun = function rawRun(code: string): [number, string] {
++API.rawRun = async function rawRun(code: string): Promise<[number, string]> {
+   const code_ptr = Module.stringToNewUTF8(code);
+   Module.API.capture_stderr();
+-  let errcode = _PyRun_SimpleString(code_ptr);
++  // @ts-expect-error
++  let errcode = await WebAssembly.promising(_PyRun_SimpleString)(code_ptr);
+   _free(code_ptr);
+   const captured_stderr = Module.API.restore_stderr().trim();
+   return [errcode, captured_stderr];
+@@ -768,14 +769,14 @@ API.bootstrapFinalizedPromise = new Promise<void>(
+  * the core `pyodide` apis. (But package loading is not ready quite yet.)
+  * @private
+  */
+-API.finalizeBootstrap = function (
++API.finalizeBootstrap = async function (
+   snapshotConfig?: SnapshotConfig,
+   snapshotDeserializer?: (obj: any) => any,
+-): PyodideAPI {
++): Promise<PyodideAPI> {
+   if (snapshotConfig) {
+     syncUpSnapshotLoad1();
+   }
+-  let [err, captured_stderr] = API.rawRun("import _pyodide_core");
++  let [err, captured_stderr] = await API.rawRun("import _pyodide_core");
+   if (err) {
+     API.fatal_loading_error(
+       "Failed to import _pyodide_core\n",
+diff --git a/src/js/pyodide.ts b/src/js/pyodide.ts
+index 61d55351..f3194598 100644
+--- a/src/js/pyodide.ts
++++ b/src/js/pyodide.ts
+@@ -364,7 +364,7 @@ If you updated the Pyodide version, make sure you also updated the 'indexURL' pa
+     snapshotConfig = API.restoreSnapshot(snapshot);
+   }
+   // runPython works starting after the call to finalizeBootstrap.
+-  const pyodide = API.finalizeBootstrap(
++  const pyodide = await API.finalizeBootstrap(
+     snapshotConfig,
+     options._snapshotDeserializer,
+   );
+diff --git a/src/js/types.ts b/src/js/types.ts
+index 6b082976..4d27c889 100644
+--- a/src/js/types.ts
++++ b/src/js/types.ts
+@@ -512,7 +512,7 @@ export interface API {
+   pyodide_ffi: any;
+   pyodide_base: any;
+   globals: PyProxy;
+-  rawRun: (code: string) => [number, string];
++  rawRun: (code: string) => Promise<[number, string]>;
+   runPythonInternal: (code: string) => any;
+   runPythonInternal_dict: any;
+   saveState: () => any;
+@@ -563,7 +563,7 @@ export interface API {
+   finalizeBootstrap: (
+     fromSnapshot?: SnapshotConfig,
+     snapshotDeserializer?: (obj: any) => any,
+-  ) => PyodideAPI;
++  ) => Promise<PyodideAPI>;
+   syncUpSnapshotLoad3(conf: SnapshotConfig): void;
+   abortSignalAny: (signals: AbortSignal[]) => AbortSignal;
+   version: string;

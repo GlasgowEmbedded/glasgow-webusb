@@ -1762,5 +1762,9 @@ export declare function loadPyodide(options?: {
 	_snapshotDeserializer?: (obj: any) => any;
 }): Promise<PyodideAPI>;
 
+export type {
+	PyodideAPI as PyodideInterface,
+};
+
 export type {};
 export type {Lockfile, LockfileInfo, LockfilePackage, PackageData};
