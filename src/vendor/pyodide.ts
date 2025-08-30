@@ -63,9 +63,9 @@ declare namespace FS {
     interface StreamOps {
         open?: (stream: FSStream) => void;
         close?: (stream: FSStream) => void;
-        read?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => number;
-        readAsync?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => Promise<number>;
-        write?: (stream: FSStream, buffer: Uint8Array, offset: number, length: number, position: number) => number;
+        read?: (stream: FSStream, buffer: Int8Array, offset: number, length: number, position: number) => number;
+        readAsync?: (stream: FSStream, buffer: Int8Array, offset: number, length: number, position: number) => Promise<number>;
+        write?: (stream: FSStream, buffer: Int8Array, offset: number, length: number, position: number) => number;
         llseek?: (stream: FSStream, offset: number, whence: number) => number;
         pollAsync?: (stream: FSStream, timeout: number) => Promise<number>;
         ioctl?: (stream: FSStream, request: number, varargs: number) => number;

@@ -382,12 +382,12 @@ declare global {
             return readBytes.length;
         },
 
-        write: (_stream, buffer, offset, length) => {
+        write: (_stream, signedBuffer, offset, length) => {
             // Note: default `buffer` is for some reason `HEAP8` (signed), while we want unsigned `HEAPU8`.
-            buffer = new Uint8Array(
-                buffer.buffer,
-                buffer.byteOffset,
-                buffer.byteLength,
+            let buffer = new Uint8Array(
+                signedBuffer.buffer,
+                signedBuffer.byteOffset,
+                signedBuffer.byteLength,
             );
             xterm.write(buffer.subarray(offset, offset + length));
             return length;
