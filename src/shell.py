@@ -41,7 +41,6 @@ while failures < 3:
         js.setInterruptFuture(to_js(interrupt_fut))
         command = reader.readline()
         with readline_reader(reader):
-            readline.add_history(command)
             readline.append_history_file(history_filename)
         sys.argv = ["glasgow", *shlex.split(command)]
         os.environ["GLASGOW_COLORS"] = "TRACE=37:INFO=1;37"
