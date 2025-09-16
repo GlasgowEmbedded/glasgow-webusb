@@ -19,6 +19,8 @@ import { GLASGOW_WHEEL_URL, HOME_DIRECTORY } from './config';
 import shell from './shell.py';
 
 declare global {
+    var GIT_COMMIT: string;
+
     namespace WebAssembly {
         const promising: unknown;
     }
@@ -38,6 +40,8 @@ declare global {
 }
 
 (async () => {
+    console.log(`[App] Built from git commit ${globalThis.GIT_COMMIT}`);
+
     const isInitializing = signal(true);
     const fileTree = signal<FileTreeNode[] | null>(null);
 
